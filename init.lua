@@ -201,14 +201,14 @@ local function GetSpells()
 end
 
 local function GUI_Spells()
-	local open, show = ImGui.Begin(bIcon..'##'..mq.TLO.Me.Name(), nil, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize))
+	local open, show = ImGui.Begin(bIcon..'##'..mq.TLO.Me.Name(), true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize))
 	if not open then
 		RUNNING = false
-		return	
-	end
-	if not show then
 		ImGui.End()
+		return
 	end
+	if show then
+
 	ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0,0)
 	for i = 1, numGems do
 		ImGui.BeginChild("##SpellGem"..i, ImVec2(40, 33), bit32.bor(ImGuiChildFlags.NoScrollbar))
@@ -297,12 +297,12 @@ local function GUI_Spells()
 			end
 		end
 	end
-
+	end
 	ImGui.End()
-
 end
 
 local function Init()
+	if mq.TLO.Me.MaxMana() == 0 then print("You are not a caster!") RUNNING = false return end
 	picker:InitializeAbilities()
 	GetSpells()
 	mq.delay(1000)
@@ -311,11 +311,12 @@ end
 
 local function Loop()
 	while RUNNING do
+		if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
 		mq.delay(100)
 		picker:Reload()
 		GetSpells()
 	end
 end
-
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
 Init()
 Loop()
