@@ -18,7 +18,7 @@ local ImGui = require('ImGui')
 local AbilityPicker = require('AbilityPicker')
 local Icon = require('mq.ICONS')
 local bIcon = Icon.FA_BOOK
-
+local casting = false
 local spellBar = {}
 local numGems = 8
 local RUNNING = true
@@ -221,6 +221,7 @@ local function GUI_Spells()
 						picker:SetClose()
 						pickerOpen = false
 						picker:ClearSelection()
+						casting = true
 					else
 						memSpell = i
 					end
@@ -237,6 +238,7 @@ local function GUI_Spells()
 				ImGui.SetTooltip(string.format("%s", spellBar[i].sName))		
 					if ImGui.IsMouseReleased(0) then
 						mq.cmdf("/cast %s", i)
+						casting = true
 						spellBar[i].sClicked = os.time()
 					end
 			end
@@ -301,9 +303,32 @@ local function GUI_Spells()
 	ImGui.End()
 end
 
+local function memSpell(line, spell)
+	for i = 1, numGems do
+		if spellBar[i].sName == spell then
+			spellBar[i].sClicked = os.time()
+			casting = true
+			break
+		end
+	end
+end
+
+local function CheckCasting()
+	if mq.TLO.Window('CastingWindow').Open() and not casting then
+		for i = 1, numGems do
+			if spellBar[i].sName == mq.TLO.Window('CastingWindow').Child('Casting_SpellName').Text() then
+				spellBar[i].sClicked = os.time()
+				casting = true
+				break
+			end
+		end
+	else casting = false end
+end
+
 local function Init()
 	if mq.TLO.Me.MaxMana() == 0 then print("You are not a caster!") RUNNING = false return end
 	picker:InitializeAbilities()
+	mq.event("mem_spell", "You have finished memorizing #1#.#*#", memSpell)
 	GetSpells()
 	mq.delay(1000)
 	mq.imgui.init('GUI_MySpells', GUI_Spells)
@@ -311,8 +336,10 @@ end
 
 local function Loop()
 	while RUNNING do
+		mq.doevents()
+		CheckCasting()
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
-		mq.delay(100)
+		mq.delay(500)
 		picker:Reload()
 		GetSpells()
 	end
