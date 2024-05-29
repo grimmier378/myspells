@@ -23,6 +23,7 @@ local themeID = 1
 local theme, defaults, settings = {}, {}, {}
 local themeFile = string.format('%s/MyThemeZ.lua', mq.configDir)
 local configFile = mq.configDir .. '/myui/MySpells_Configs.lua'
+local themezDir = mq.luaDir .. '/themez/init.lua'
 local themeName = 'Default'
 local script = 'MySpells'
 local casting = false
@@ -43,13 +44,14 @@ local pickerOpen = false
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize = 0, 0, 30
-local aSize, locked, themeGUI = false, false, false
+local aSize, locked, hasThemeZ, themeGUI = false, false, false, false
 
 defaults = {
 	Scale = 1.0,
 	LoadTheme = 'Default',
 	locked = false,
 	IconSize = 30,
+	maxRow = 0,
 	AutoSize = false,
 }
 
@@ -134,6 +136,10 @@ local function loadSettings()
 		settings[script].Scale = 1
 		newSetting = true
 	end
+	if settings[script].maxRow == nil then
+		settings[script].maxRow = 1
+		newSetting = true
+	end
 	
 	if not settings[script].LoadTheme then
 		settings[script].LoadTheme = 'Default'
@@ -152,6 +158,8 @@ local function loadSettings()
 		newSetting = true
 	end
 		
+	-- Set the settings to the variables
+	maxRow = settings[script].maxRow
 	aSize = settings[script].AutoSize
 	iconSize = settings[script].IconSize
 	locked = settings[script].locked
@@ -216,7 +224,8 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 			ImGui.GetWindowDrawList():AddRectFilled(startPos, endPos, OverlayColor)
 			ImGui.SetCursorPos(cursor_x + (iconSize / 2), cursor_y + (iconSize / 2))
 			-- print the remaining time
-			ImGui.TextDisabled(string.format("%d", remaining-1))
+
+			ImGui.Text("%d", remaining-1)
 		
 		else
 			-- spell is not ready to cast and was not clicked most likely from global cooldown or just memmed
@@ -325,7 +334,14 @@ local function DrawThemeWin()
 		end
 		ImGui.EndCombo()
 	end
-			
+	
+	if hasThemeZ then
+		if ImGui.Button('Edit ThemeZ') then
+			mq.cmd("/lua run themez")
+		end
+		ImGui.SameLine()
+	end
+
 	if ImGui.Button('Reload Theme File') then
 		loadTheme()
 	end
@@ -348,7 +364,9 @@ local function GUI_Spells()
 		-- Calculate maxRow to account for window padding and element size
 		local windowWidth = ImGui.GetWindowWidth()
 		maxRow = math.floor(windowWidth / 44)
-
+		if aSize then
+			maxRow = settings[script].maxRow
+		end
 		currentTime = os.time()
 		rowCount = 0
 		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0,0)
@@ -358,6 +376,9 @@ local function GUI_Spells()
 			end
 			if ImGui.MenuItem('Auto Size') then
 				aSize = not aSize
+				if aSize then
+					settings[script].maxRow = maxRow
+				end
 				settings[script].AutoSize = aSize
 				mq.pickle(configFile, settings)
 			end
@@ -473,7 +494,6 @@ local function GUI_Spells()
 
 end
 
-
 local function MemSpell(line, spell)
 	for i = 1, numGems do
 		if spellBar[i].sName == spell then
@@ -499,6 +519,9 @@ end
 local function Init()
 	if mq.TLO.Me.MaxMana() == 0 then print("You are not a caster!") RUNNING = false return end
 	loadSettings()
+	if File_Exists(themezDir) then
+		hasThemeZ = true
+	end
 	picker:InitializeAbilities()
 	mq.event("mem_spell", "You have finished memorizing #1#.#*#", MemSpell)
 	GetSpells()
