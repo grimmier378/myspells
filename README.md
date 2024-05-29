@@ -18,7 +18,10 @@ This script creates a spell bar that allows you to cast spells from your spell g
 * Spells that are on cooldown will have a cooldown overlay.
 * Spells that are not ready to cast will have a faded gem overlay.
 * Added timers for when we detect you memorized a new spell
-* added checks to see if you cast a spell without clicking the gem
+* Added checks to see if you cast a spell without clicking the gem
+* Window is resizable into rows and columns as you see fit. 
+* Right Clicking the Title bar will bring up options to change theme, and Auto-resize the window.
+
 
 ## Video
 

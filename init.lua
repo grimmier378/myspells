@@ -18,6 +18,13 @@ local ImGui = require('ImGui')
 local AbilityPicker = require('AbilityPicker')
 local Icon = require('mq.ICONS')
 local bIcon = Icon.FA_BOOK
+local LoadTheme = require('lib.theme_loader')
+local themeID = 1
+local theme, defaults, settings = {}, {}, {}
+local themeFile = string.format('%s/MyThemeZ.lua', mq.configDir)
+local configFile = mq.configDir .. '/myui/MySpells_Configs.lua'
+local themeName = 'Default'
+local script = 'MySpells'
 local casting = false
 local spellBar = {}
 local numGems = 8
@@ -35,8 +42,16 @@ local picker = AbilityPicker.new()
 local pickerOpen = false
 local memSpell = -1
 local currentTime = os.time()
-local maxRow, rowCount = 0, 0
-local aSize = false
+local maxRow, rowCount, iconSize = 0, 0, 30
+local aSize, locked, themeGUI = false, false, false
+
+defaults = {
+	Scale = 1.0,
+	LoadTheme = 'Default',
+	locked = false,
+	IconSize = 30,
+	AutoSize = false,
+}
 
 local function pickColor(spellID)
 	local spell = mq.TLO.Spell(spellID)
@@ -68,13 +83,91 @@ local function pickColor(spellID)
 
 end
 
+---comment Check to see if the file we want to work on exists.
+---@param name string -- Full Path to file
+---@return boolean -- returns true if the file exists and false otherwise
+local function File_Exists(name)
+	local f=io.open(name,"r")
+	if f~=nil then io.close(f) return true else return false end
+end
+
+local function loadTheme()
+	if File_Exists(themeFile) then
+		theme = dofile(themeFile)
+		else
+		theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+	end
+	themeName = settings[script].LoadTheme or 'Default'
+		if theme and theme.Theme then
+			for tID, tData in pairs(theme.Theme) do
+				if tData['Name'] == themeName then
+					themeID = tID
+				end
+			end
+		end
+end
+
+local function loadSettings()
+	-- Check if the dialog data file exists
+	local newSetting = false
+	if not File_Exists(configFile) then
+		settings[script] = defaults
+		mq.pickle(configFile, settings)
+		loadSettings()
+		else
+			
+		-- Load settings from the Lua config file
+		settings = dofile(configFile)
+		if settings[script] == nil then
+			settings[script] = {}
+		settings[script] = defaults 
+		newSetting = true
+		end
+	end
+		
+	if settings[script].locked == nil then
+		settings[script].locked = false
+		newSetting = true
+	end
+		
+	if settings[script].Scale == nil then
+		settings[script].Scale = 1
+		newSetting = true
+	end
+	
+	if not settings[script].LoadTheme then
+		settings[script].LoadTheme = 'Default'
+		newSetting = true
+	end
+	
+	loadTheme()
+
+	if settings[script].IconSize == nil then
+		settings[script].IconSize = iconSize
+		newSetting = true
+	end
+	
+	if settings[script].AutoSize == nil then
+		settings[script].AutoSize = aSize
+		newSetting = true
+	end
+		
+	aSize = settings[script].AutoSize
+	iconSize = settings[script].IconSize
+	locked = settings[script].locked
+	Scale = settings[script].Scale
+	themeName = settings[script].LoadTheme
+		
+	if newSetting then mq.pickle(configFile, settings) end
+	
+end
+
 --- comments
 ---@param iconID integer
 ---@param spell table
 ---@param i integer
 local function DrawInspectableSpellIcon(iconID, spell, i)
 	local cursor_x, cursor_y = ImGui.GetCursorPos()
-	local iconSize = 30
 	local gem = mq.FindTextureAnimation('A_SpellGemHolder')
 
 	-- draw gem holder
@@ -202,12 +295,52 @@ local function GetSpells()
 	end
 end
 
+local function DrawThemeWin()
+	if not themeGUI then return end
+	local ColorCountTheme, StyleCountTheme = LoadTheme.StartTheme(theme.Theme[themeID])
+	local openTheme, showTheme = ImGui.Begin('Theme Selector##MySpells_',true,bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
+	if not openTheme then
+		themeGUI = false
+	end
+	if not showTheme then
+		LoadTheme.EndTheme(ColorCountTheme, StyleCountTheme)
+		ImGui.End()
+		return
+	end
+	ImGui.SeparatorText("Theme##DialogDB")
+			
+	ImGui.Text("Cur Theme: %s", themeName)
+	-- Combo Box Load Theme
+	if ImGui.BeginCombo("Load Theme##DialogDB", themeName) then
+			
+		for k, data in pairs(theme.Theme) do
+			local isSelected = data.Name == themeName
+			if ImGui.Selectable(data.Name, isSelected) then
+				theme.LoadTheme = data.Name
+				themeID = k
+				themeName = theme.LoadTheme
+				settings[script].LoadTheme = themeName
+				mq.pickle(configFile, settings)
+			end
+		end
+		ImGui.EndCombo()
+	end
+			
+	if ImGui.Button('Reload Theme File') then
+		loadTheme()
+	end
+	LoadTheme.EndTheme(ColorCountTheme, StyleCountTheme)
+	ImGui.End()
+end
+
 local function GUI_Spells()
 	local winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize)
 	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
-	local open, show = ImGui.Begin(bIcon..'##'..mq.TLO.Me.Name(), true, winFlags)
+	local ColorCount, StyleCount =LoadTheme.StartTheme(theme.Theme[themeID])
+	local open, show = ImGui.Begin(bIcon..'##MySpells_'..mq.TLO.Me.Name(), true, winFlags)
 	if not open then
 		RUNNING = false
+		LoadTheme.EndTheme(ColorCount, StyleCount)
 		ImGui.End()
 		return
 	end
@@ -219,7 +352,17 @@ local function GUI_Spells()
 		currentTime = os.time()
 		rowCount = 0
 		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0,0)
-        
+		if ImGui.BeginPopupContextItem("##MySpells_theme") then
+			if ImGui.MenuItem("Change Theme") then
+				themeGUI = not themeGUI
+			end
+			if ImGui.MenuItem('Auto Size') then
+				aSize = not aSize
+				settings[script].AutoSize = aSize
+				mq.pickle(configFile, settings)
+			end
+			ImGui.EndPopup()
+		end
 		for i = 1, numGems do
 			ImGui.BeginChild("##SpellGem"..i, ImVec2(40, 33), bit32.bor(ImGuiChildFlags.NoScrollbar,ImGuiChildFlags.AlwaysUseWindowPadding))
 			if spellBar[i].sID > -1 then
@@ -320,10 +463,14 @@ local function GUI_Spells()
 		ImGui.EndChild()
 		
 	end
-	if ImGui.IsWindowHovered() and ImGui.IsMouseReleased(1) then
-		aSize = not aSize
-	end
+
+	LoadTheme.EndTheme(ColorCount, StyleCount)
 	ImGui.End()
+
+	if themeGUI then
+		DrawThemeWin()
+	end
+
 end
 
 
@@ -351,6 +498,7 @@ end
 
 local function Init()
 	if mq.TLO.Me.MaxMana() == 0 then print("You are not a caster!") RUNNING = false return end
+	loadSettings()
 	picker:InitializeAbilities()
 	mq.event("mem_spell", "You have finished memorizing #1#.#*#", MemSpell)
 	GetSpells()
