@@ -34,7 +34,9 @@ local closedBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/closed_book.p
 local picker = AbilityPicker.new()
 local pickerOpen = false
 local memSpell = -1
-
+local currentTime = os.time()
+local maxRow, rowCount = 0, 0
+local aSize = false
 
 local function pickColor(spellID)
 	local spell = mq.TLO.Spell(spellID)
@@ -96,7 +98,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	local startPos = ImGui.GetCursorScreenPosVec()
 	local endPos
 	local recast = spell.sRecast + 2 + spell.sCastTime
-	local currentTime = os.time()
+	
 	local diff = currentTime - spell.sClicked
 	local remaining = recast - diff
 	local percent = remaining / recast
@@ -201,109 +203,131 @@ local function GetSpells()
 end
 
 local function GUI_Spells()
-	local open, show = ImGui.Begin(bIcon..'##'..mq.TLO.Me.Name(), true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize))
+	local winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize)
+	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
+	local open, show = ImGui.Begin(bIcon..'##'..mq.TLO.Me.Name(), true, winFlags)
 	if not open then
 		RUNNING = false
 		ImGui.End()
 		return
 	end
 	if show then
+		-- Calculate maxRow to account for window padding and element size
+		local windowWidth = ImGui.GetWindowWidth()
+		maxRow = math.floor(windowWidth / 44)
 
-	ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0,0)
-	for i = 1, numGems do
-		ImGui.BeginChild("##SpellGem"..i, ImVec2(40, 33), bit32.bor(ImGuiChildFlags.NoScrollbar))
-		if spellBar[i].sID > -1 then
-			DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
-			if ImGui.BeginPopupContextItem("##SpellGem"..i) then
-				if ImGui.MenuItem("Memorize") then
-					if pickerOpen == true then
-						memSpell = -1
-						picker:SetClose()
-						pickerOpen = false
-						picker:ClearSelection()
-						casting = true
-					else
-						memSpell = i
+		currentTime = os.time()
+		rowCount = 0
+		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0,0)
+        
+		for i = 1, numGems do
+			ImGui.BeginChild("##SpellGem"..i, ImVec2(40, 33), bit32.bor(ImGuiChildFlags.NoScrollbar,ImGuiChildFlags.AlwaysUseWindowPadding))
+			if spellBar[i].sID > -1 then
+				DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
+				if ImGui.BeginPopupContextItem("##SpellGem"..i) then
+					if ImGui.MenuItem("Memorize") then
+						if pickerOpen == true then
+							memSpell = -1
+							picker:SetClose()
+							pickerOpen = false
+							picker:ClearSelection()
+							casting = true
+						else
+							memSpell = i
+						end
 					end
+					if ImGui.MenuItem("Inspect") then
+						mq.cmdf("/altkey /notify CastSpellWnd CSPW_Spell%s leftmouseup", i-1)
+					end
+					if ImGui.MenuItem("Clear") then
+						mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i-1)
+					end
+					ImGui.EndPopup()
 				end
-				if ImGui.MenuItem("Inspect") then
-					mq.cmdf("/altkey /notify CastSpellWnd CSPW_Spell%s leftmouseup", i-1)
-				end
-				if ImGui.MenuItem("Clear") then
-					mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i-1)
-				end
-				ImGui.EndPopup()
-			end
-			if ImGui.IsItemHovered() then
-				ImGui.SetTooltip(string.format("%s", spellBar[i].sName))		
+				if ImGui.IsItemHovered() then
+					ImGui.SetTooltip(string.format("%d) %s",i, spellBar[i].sName))        
 					if ImGui.IsMouseReleased(0) then
 						mq.cmdf("/cast %s", i)
 						casting = true
 						spellBar[i].sClicked = os.time()
 					end
+				end
+			else
+				DrawInspectableSpellIcon(-1, spellBar[i], i)
+				if ImGui.IsItemHovered() then
+					ImGui.SetTooltip("Empty")
+					if ImGui.IsMouseReleased(1) then
+						if pickerOpen == true then
+							memSpell = -1
+							picker:SetClose()
+							pickerOpen = false
+							picker:ClearSelection()
+						else
+							memSpell = i
+						end
+					end
+				end
+			end
+			ImGui.EndChild()
+			rowCount = rowCount + 1
+
+			if rowCount < maxRow then
+				ImGui.SameLine()
+			else
+				rowCount = 0
+			end
+		end
+        
+		ImGui.PopStyleVar()
+		if memSpell ~= -1 and not pickerOpen then
+			picker:SetOpen()
+			pickerOpen = true
+		end
+		if picker.Selected then
+			local selected = picker.Selected or {}
+			if selected.Type == 'Spell' then
+				mq.cmdf("/memspell %d \"%s\"", memSpell, selected.Name)
+				memSpell = -1
+				picker:SetClose()
+				pickerOpen = false
+				picker:ClearSelection()
+			end
+		end
+		picker:DrawAbilityPicker()
+
+		ImGui.BeginChild("##SpellBook", ImVec2(40, 40), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
+		local cursor_x, cursor_y = ImGui.GetCursorPos()
+
+		if mq.TLO.Window('SpellBookWnd').Open() then
+			ImGui.SetCursorPos(cursor_x+10, cursor_y)
+			ImGui.Image(openBook:GetTextureID(), ImVec2(40, 40))
+			if ImGui.IsItemHovered() then
+				ImGui.SetTooltip("Close Spell Book")
+				if ImGui.IsMouseReleased(0) then
+					mq.TLO.Window('SpellBookWnd').DoClose()
+				end
 			end
 		else
-			DrawInspectableSpellIcon(-1, spellBar[i], i)
+			ImGui.SetCursorPos(cursor_x+10, cursor_y+5)
+			ImGui.Image(closedBook:GetTextureID(), ImVec2(40, 30))
 			if ImGui.IsItemHovered() then
-				ImGui.SetTooltip("Empty")
-				if ImGui.IsMouseReleased(1) then
-					if pickerOpen == true then
-						memSpell = -1
-						picker:SetClose()
-						pickerOpen = false
-						picker:ClearSelection()
-					else
-						memSpell = i
-					end
+				ImGui.SetTooltip("Open Spell Book")
+				if ImGui.IsMouseReleased(0) then
+					mq.TLO.Window('SpellBookWnd').DoOpen()
 				end
 			end
 		end
 		ImGui.EndChild()
-
-	end
-	ImGui.PopStyleVar()
-	if memSpell ~= -1 and not pickerOpen then
-		picker:SetOpen()
-		pickerOpen = true
-	end
-	if picker.Selected then
-			
-		local selected = picker.Selected or {}
-		if selected.Type == 'Spell' then
-			mq.cmdf("/memspell %d \"%s\"", memSpell, selected.Name)
-			memSpell = -1
-			picker:SetClose()
-			pickerOpen = false
-			picker:ClearSelection()
-		end
-	end
-	picker:DrawAbilityPicker()
-	local cursor_x, cursor_y = ImGui.GetCursorPos()
-	ImGui.SetCursorPos(17, cursor_y)
-	if mq.TLO.Window('SpellBookWnd').Open() then
 		
-		ImGui.Image(openBook:GetTextureID(), ImVec2(40, 40))
-		if ImGui.IsItemHovered() then
-			ImGui.SetTooltip("Close Spell Book")
-		
-			if ImGui.IsMouseReleased(0) then
-				mq.TLO.Window('SpellBookWnd').DoClose()
-			end
-		end
-	else
-		ImGui.Image(closedBook:GetTextureID(), ImVec2(40, 30))
-		if ImGui.IsItemHovered() then
-			ImGui.SetTooltip("Open Spell Book")
-			if ImGui.IsMouseReleased(0) then
-				mq.TLO.Window('SpellBookWnd').DoOpen()
-			end
-		end
 	end
+	if ImGui.IsWindowHovered() and ImGui.IsMouseReleased(1) then
+		aSize = not aSize
 	end
 	ImGui.End()
 end
 
-local function memSpell(line, spell)
+
+local function MemSpell(line, spell)
 	for i = 1, numGems do
 		if spellBar[i].sName == spell then
 			spellBar[i].sClicked = os.time()
@@ -328,7 +352,7 @@ end
 local function Init()
 	if mq.TLO.Me.MaxMana() == 0 then print("You are not a caster!") RUNNING = false return end
 	picker:InitializeAbilities()
-	mq.event("mem_spell", "You have finished memorizing #1#.#*#", memSpell)
+	mq.event("mem_spell", "You have finished memorizing #1#.#*#", MemSpell)
 	GetSpells()
 	mq.delay(1000)
 	mq.imgui.init('GUI_MySpells', GUI_Spells)
