@@ -46,6 +46,7 @@ local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
 local aSize, locked, hasThemeZ, configWindowShow, loadSet = false, false, false, false, false
 local meName, setName
+local tmpName = setName or ''
 
 defaults = {
 	Scale = 1.0,
@@ -314,10 +315,13 @@ local function GetSpells()
 end
 
 local function SaveSet(SetName)
+	settings = dofile(configFile)
 	if settings[script][meName].Sets[SetName] == nil then
 		settings[script][meName].Sets[SetName] = {}
 	end
+	
 	settings[script][meName].Sets[SetName]= spellBar
+
 	mq.pickle(configFile, settings)
 end
 
@@ -386,7 +390,7 @@ local function DrawConfigWin()
 	LoadTheme.EndTheme(ColorCountTheme, StyleCountTheme)
 	ImGui.End()
 end
-local tmpName = setName or ''
+
 local function GUI_Spells()
 	local winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize)
 	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
@@ -430,6 +434,7 @@ local function GUI_Spells()
 			if spellBar[i].sID > -1 then
 				DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
 				if ImGui.BeginPopupContextItem("##SpellGem"..i) then
+					if ImGui.IsKeyDown(ImGuiMod.Ctrl) then ImGui.CloseCurrentPopup() end
 					if ImGui.MenuItem("Memorize") then
 						if pickerOpen == true then
 							memSpell = -1
@@ -455,6 +460,8 @@ local function GUI_Spells()
 						mq.cmdf("/cast %s", i)
 						casting = true
 						spellBar[i].sClicked = os.time()
+					elseif ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsMouseReleased(1) then
+						mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i-1)
 					end
 				end
 			else
