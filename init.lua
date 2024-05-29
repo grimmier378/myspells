@@ -205,7 +205,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	local OverlayColor = IM_COL32(0, 0, 0, 0.9 * 255)
 	local startPos = ImGui.GetCursorScreenPosVec()
 	local endPos
-	local recast = spell.sRecast + 2 + spell.sCastTime
+	local recast = spell.sRecast -- + spell.sCastTime
 	
 	local diff = currentTime - spell.sClicked
 	local remaining = recast - diff
@@ -232,7 +232,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 			ImGui.SetCursorPos(cursor_x + (scale* (iconSize / 2)), cursor_y + (scale * (iconSize / 2)))
 			-- print the remaining time
 
-			ImGui.Text("%d", remaining-1)
+			ImGui.Text("%d", remaining )--1)
 		
 		else
 			-- spell is not ready to cast and was not clicked most likely from global cooldown or just memmed
