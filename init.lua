@@ -44,7 +44,8 @@ local closedBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/closed_book.p
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
-local aSize, locked, hasThemeZ, configWindowShow = false, false, false, false
+local aSize, locked, hasThemeZ, configWindowShow, loadSet = false, false, false, false, false
+local meName, setName
 
 defaults = {
 	Scale = 1.0,
@@ -146,6 +147,12 @@ local function loadSettings()
 		newSetting = true
 	end
 	
+	if settings[script][meName] == nil then
+		settings[script][meName] = {}
+		settings[script][meName].Sets = {}
+		newSetting = true
+	end
+
 	loadTheme()
 
 	if settings[script].IconSize == nil then
@@ -306,6 +313,28 @@ local function GetSpells()
 	end
 end
 
+local function SaveSet(SetName)
+	if settings[script][meName].Sets[SetName] == nil then
+		settings[script][meName].Sets[SetName] = {}
+	end
+	settings[script][meName].Sets[SetName]= spellBar
+	mq.pickle(configFile, settings)
+end
+
+local function LoadSet(set)
+	spellBar = settings[script][meName].Sets[set]
+	for i = 1, numGems do
+		if spellBar[i].sName ~= nil then
+			if spellBar[i].sName ~= "Empty" then
+				mq.cmdf("/memspell %d \"%s\"", i, spellBar[i].sName)
+			end
+			while mq.TLO.Window('SpellBookWnd').Open() do
+				mq.delay(1000)
+			end
+		end
+	end
+end
+
 local function DrawConfigWin()
 	if not configWindowShow then return end
 	local ColorCountTheme, StyleCountTheme = LoadTheme.StartTheme(theme.Theme[themeID])
@@ -357,7 +386,7 @@ local function DrawConfigWin()
 	LoadTheme.EndTheme(ColorCountTheme, StyleCountTheme)
 	ImGui.End()
 end
-
+local tmpName = setName or ''
 local function GUI_Spells()
 	local winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize)
 	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
@@ -493,6 +522,37 @@ local function GUI_Spells()
 				end
 			end
 		end
+		if ImGui.BeginPopupContextWindow("##SpellBook") then
+			ImGui.SeparatorText("Save Set")
+			ImGui.SetNextItemWidth(150)
+			tmpName = ImGui.InputText("##SetName", tmpName)
+			ImGui.SameLine()
+			if ImGui.Button("Save Set") then
+				if tmpName ~= '' then
+					setName = tmpName
+					tmpName = ''
+					SaveSet(setName)
+					ImGui.CloseCurrentPopup()
+				end
+			end
+			ImGui.SeparatorText("Load Set")
+			ImGui.SetNextItemWidth(150)
+			if ImGui.BeginCombo("##LoadSet", setName) then
+				for k, data in pairs(settings[script][meName].Sets) do
+					local isSelected = k == setName
+					if ImGui.Selectable(k, isSelected) then
+						setName = k
+					end
+				end
+				ImGui.EndCombo()
+			end
+			ImGui.SameLine()
+			if ImGui.Button("Load Set") then
+				loadSet = true
+				ImGui.CloseCurrentPopup()
+			end
+			ImGui.EndPopup()
+		end
 		ImGui.SetWindowFontScale(1)
 		ImGui.EndChild()
 		
@@ -529,6 +589,7 @@ local function CheckCasting()
 end
 
 local function Init()
+	meName = mq.TLO.Me.Name()
 	if mq.TLO.Me.MaxMana() == 0 then print("You are not a caster!") RUNNING = false return end
 	loadSettings()
 	if File_Exists(themezDir) then
@@ -544,6 +605,7 @@ end
 local function Loop()
 	while RUNNING do
 		mq.doevents()
+		if loadSet then LoadSet(setName) loadSet = false end
 		CheckCasting()
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
 		mq.delay(500)
