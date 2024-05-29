@@ -44,9 +44,10 @@ local closedBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/closed_book.p
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
-local aSize, locked, hasThemeZ, configWindowShow, loadSet = false, false, false, false, false
-local meName, setName
-local tmpName = setName or ''
+local aSize, locked, hasThemeZ, configWindowShow, loadSet, clearAll = false, false, false, false, false, false
+local meName
+local setName = 'None'
+local tmpName = ''
 
 defaults = {
 	Scale = 1.0,
@@ -138,6 +139,7 @@ local function loadSettings()
 		settings[script].Scale = 1
 		newSetting = true
 	end
+
 	if settings[script].maxRow == nil then
 		settings[script].maxRow = 1
 		newSetting = true
@@ -272,27 +274,28 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	ImGui.PopID()
 end
 
-local function GetSpells()
+local function GetSpells(slot)
 	local bonusGems = mq.TLO.Me.AltAbility('Mnemonic Retention').Rank() or 0
 	numGems = 8 + bonusGems
-	for i = 1, numGems do
-		local sToolTip = mq.TLO.Window(string.format('CastSpellWnd/CSPW_Spell%s',i-1)).Tooltip()
+
+	local function GetInfo(slotNum)
+		local sToolTip = mq.TLO.Window(string.format('CastSpellWnd/CSPW_Spell%s',slotNum-1)).Tooltip()
 		local sName
 		local sRecast
 		local sClicked 
 		local sID, sIcon
 		local sCastTime
-		if spellBar[i] == nil then
-			spellBar[i] = {}
+		if spellBar[slotNum] == nil then
+			spellBar[slotNum] = {}
 		end
-		if spellBar[i].sClicked == nil then
-			spellBar[i].sClicked = -1
+		if spellBar[slotNum].sClicked == nil then
+			spellBar[slotNum].sClicked = -1
 		end
-
+	
 		if sToolTip:find("%)%s") then
-			sName = sToolTip:sub(sToolTip:find("%)%s")+2,-1)
+			sName = mq.TLO.Me.Gem(slotNum).Name()--sToolTip:sub(sToolTip:find("%)%s")+2,-1)
 			sID = mq.TLO.Spell(sName).ID() or -1
-			sClicked = spellBar[i].sClicked or -1
+			sClicked = spellBar[slotNum].sClicked or -1
 			sRecast = mq.TLO.Spell(sName).RecastTime.Seconds() or -1
 			sIcon = mq.TLO.Spell(sName).SpellIcon()	or -1
 			sCastTime = mq.TLO.Spell(sName).MyCastTime.Seconds() or -1
@@ -304,14 +307,23 @@ local function GetSpells()
 			sRecast = -1
 			sCastTime = -1
 		end
-		
-		spellBar[i].sCastTime = sCastTime
-		spellBar[i].sName = sName
-		spellBar[i].sID = sID
-		spellBar[i].sIcon = sIcon
-		spellBar[i].sClicked = sClicked
-		spellBar[i].sRecast = sRecast
+			
+		spellBar[slotNum].sCastTime = sCastTime
+		spellBar[slotNum].sName = sName
+		spellBar[slotNum].sID = sID
+		spellBar[slotNum].sIcon = sIcon
+		spellBar[slotNum].sClicked = sClicked
+		spellBar[slotNum].sRecast = sRecast
 	end
+
+	if slot == nil then
+		for i = 1, numGems do
+			GetInfo(i)
+		end
+	else
+		GetInfo(slot)
+	end
+
 end
 
 local function SaveSet(SetName)
@@ -320,23 +332,63 @@ local function SaveSet(SetName)
 		settings[script][meName].Sets[SetName] = {}
 	end
 	
-	settings[script][meName].Sets[SetName]= spellBar
+	settings[script][meName].Sets[SetName] = spellBar
 
 	mq.pickle(configFile, settings)
+	settings = dofile(configFile)
+	tmpName = ''
 end
 
 local function LoadSet(set)
-	spellBar = settings[script][meName].Sets[set]
+	-- print("Loading Set: ", set)
+	local setBar = settings[script][meName].Sets[set]
+	mq.TLO.Window('SpellBookWnd').DoOpen()
+	mq.delay(5)
 	for i = 1, numGems do
-		if spellBar[i].sName ~= nil then
-			if spellBar[i].sName ~= "Empty" then
-				mq.cmdf("/memspell %d \"%s\"", i, spellBar[i].sName)
-			end
-			while mq.TLO.Window('SpellBookWnd').Open() do
-				mq.delay(1000)
+		if setBar[i].sName ~= nil then
+			if mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName then
+				
+				if setBar[i].sName ~= "Empty" then
+					mq.cmdf("/memspell %d \"%s\"", i, setBar[i].sName)
+					-- printf("/memspell %d \"%s\"", i, setBar[i].sName)
+					
+				end
+
+				while mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName do
+					if not mq.TLO.Window('SpellBookWnd').Open() then
+						spellBar[i].sName = 'Empty'
+						spellBar[i].sID = -1
+						spellBar[i].sIcon = -1
+						spellBar[i].sClicked = -1
+						spellBar[i].sRecast = -1
+						spellBar[i].sCastTime = -1
+						GetSpells(i)
+						loadSet = false
+						return
+					end
+				end
+				spellBar[i]  = setBar[i]
 			end
 		end
 	end
+	mq.TLO.Window('SpellBookWnd').DoClose()
+	mq.delay(1)
+	-- spellBar = setBar
+	loadSet = false
+end
+
+local function ClearGems()
+	for i = 1, numGems do
+		mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i-1)
+		mq.delay(300)
+		spellBar[i].sName = 'Empty'
+		spellBar[i].sID = -1
+		spellBar[i].sIcon = -1
+		spellBar[i].sClicked = -1
+		spellBar[i].sRecast = -1
+		spellBar[i].sCastTime = -1
+	end
+	clearAll = false
 end
 
 local function DrawConfigWin()
@@ -351,18 +403,20 @@ local function DrawConfigWin()
 		ImGui.End()
 		return
 	end
-	ImGui.SeparatorText("Theme##DialogDB")
+	ImGui.SeparatorText("Theme##MySpells")
 			
 	ImGui.Text("Cur Theme: %s", themeName)
 	-- Combo Box Load Theme
-	if ImGui.BeginCombo("Load Theme##DialogDB", themeName) then
+	if ImGui.BeginCombo("Load Theme##MySpells", themeName) then
 			
 		for k, data in pairs(theme.Theme) do
 			local isSelected = data.Name == themeName
 			if ImGui.Selectable(data.Name, isSelected) then
 				theme.LoadTheme = data.Name
 				themeID = k
+				
 				themeName = theme.LoadTheme
+				settings = dofile(configFile)
 				settings[script].LoadTheme = themeName
 				mq.pickle(configFile, settings)
 			end
@@ -373,6 +427,7 @@ local function DrawConfigWin()
 	scale = ImGui.SliderFloat("Scale##DialogDB", scale, 0.8, 2)
 	if scale ~= settings[script].Scale then
 		if scale < 0.8 then scale = 0.8 end
+		settings = dofile(configFile)
 		settings[script].Scale = scale
 		mq.pickle(configFile, settings)
 	end
@@ -418,11 +473,14 @@ local function GUI_Spells()
 			if ImGui.MenuItem("Configure") then
 				configWindowShow = not configWindowShow
 			end
-			if ImGui.MenuItem('Auto Size') then
+			local aLabel = aSize and 'Disable Auto Size' or 'Enable Auto Size'
+			if ImGui.MenuItem(aLabel) then
 				aSize = not aSize
+				settings = dofile(configFile)
 				if aSize then
 					settings[script].maxRow = maxRow
 				end
+				
 				settings[script].AutoSize = aSize
 				mq.pickle(configFile, settings)
 			end
@@ -529,6 +587,7 @@ local function GUI_Spells()
 				end
 			end
 		end
+
 		if ImGui.BeginPopupContextWindow("##SpellBook") then
 			ImGui.SeparatorText("Save Set")
 			ImGui.SetNextItemWidth(150)
@@ -537,7 +596,6 @@ local function GUI_Spells()
 			if ImGui.Button("Save Set") then
 				if tmpName ~= '' then
 					setName = tmpName
-					tmpName = ''
 					SaveSet(setName)
 					ImGui.CloseCurrentPopup()
 				end
@@ -557,6 +615,22 @@ local function GUI_Spells()
 			if ImGui.Button("Load Set") then
 				loadSet = true
 				ImGui.CloseCurrentPopup()
+			end
+
+			if setName ~= 'None' then
+				if ImGui.Button("Delete Set") then
+					settings = dofile(configFile)
+					settings[script][meName].Sets[setName] = nil
+					mq.pickle(configFile, settings)
+					setName = 'None'
+					tmpName = ''
+					ImGui.CloseCurrentPopup()
+				end
+				ImGui.SameLine()
+			end
+
+			if ImGui.Button("Clear Gems") then
+				clearAll = true
 			end
 			ImGui.EndPopup()
 		end
@@ -612,7 +686,8 @@ end
 local function Loop()
 	while RUNNING do
 		mq.doevents()
-		if loadSet then LoadSet(setName) loadSet = false end
+		if loadSet then LoadSet(setName) end
+		if clearAll then ClearGems() end
 		CheckCasting()
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
 		mq.delay(500)
