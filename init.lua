@@ -16,6 +16,8 @@
 local mq = require('mq')
 local ImGui = require('ImGui')
 local AbilityPicker = require('AbilityPicker')
+local picker = AbilityPicker.new()
+local pickerOpen = false
 local Icon = require('mq.ICONS')
 local bIcon = Icon.FA_BOOK
 local LoadTheme = require('lib.theme_loader')
@@ -39,12 +41,10 @@ local orangeGem = mq.CreateTexture(mq.luaDir .. '/myspells/images/orange_gem.png
 local yellowGem = mq.CreateTexture(mq.luaDir .. '/myspells/images/yellow_gem.png')
 local openBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/open_book.png')
 local closedBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/closed_book.png')
-local picker = AbilityPicker.new()
-local pickerOpen = false
 local memSpell = -1
 local currentTime = os.time()
-local maxRow, rowCount, iconSize = 0, 0, 30
-local aSize, locked, hasThemeZ, themeGUI = false, false, false, false
+local maxRow, rowCount, iconSize, scale = 0, 0, 30, 1
+local aSize, locked, hasThemeZ, configWindowShow = false, false, false, false
 
 defaults = {
 	Scale = 1.0,
@@ -163,7 +163,7 @@ local function loadSettings()
 	aSize = settings[script].AutoSize
 	iconSize = settings[script].IconSize
 	locked = settings[script].locked
-	Scale = settings[script].Scale
+	scale = settings[script].Scale
 	themeName = settings[script].LoadTheme
 		
 	if newSetting then mq.pickle(configFile, settings) end
@@ -180,7 +180,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 
 	-- draw gem holder
 	ImGui.SetCursorPos(cursor_x -1, cursor_y)
-	ImGui.DrawTextureAnimation(gem, iconSize +12, iconSize+2 )
+	ImGui.DrawTextureAnimation(gem, scale*(iconSize +12), scale*(iconSize+2) )
 
 	ImGui.SetCursorPos(cursor_x, cursor_y)
 	if iconID == -1 then
@@ -190,8 +190,8 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 
 	-- draw spell icon
 	animSpell:SetTextureCell(iconID or 0)	
-	ImGui.SetCursorPos(cursor_x + 8, cursor_y+ 5)
-	ImGui.DrawTextureAnimation(animSpell, iconSize - 5, iconSize - 5)
+	ImGui.SetCursorPos(cursor_x + (scale *8), cursor_y +(5 * scale) )
+	ImGui.DrawTextureAnimation(animSpell, scale*(iconSize - 5), scale*(iconSize - 5))
 	
 	----------- overlay ----------------
 	ImGui.SetCursorPos(cursor_x, cursor_y - 2)
@@ -210,19 +210,19 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 
 	if not mq.TLO.Cast.Ready('"' .. spell.sName .. '"')() then
 		-- spell is not ready to cast
-		ImGui.SetCursorPos(cursor_x + 8, cursor_y +5 )
+		ImGui.SetCursorPos(cursor_x + (scale *8), cursor_y +(5 * scale) )
 		if spell.sClicked > 0 then
 			-- spell was cast and is on cooldown
 			if percent < 0 then percent = 0 end -- Ensure percent is not negative
 			OverlayColor = IM_COL32(21,2,2,238)
 			startPos = ImGui.GetCursorScreenPosVec()
 			-- adjust the height of the overlay based on the remaining time
-			local adjustedHeight = (iconSize -5) * percent
-			endPos = ImVec2(startPos.x + iconSize -5  , startPos.y + iconSize -5)
+			local adjustedHeight = (scale*(iconSize -5)) * percent
+			endPos = ImVec2(startPos.x + ((iconSize -5)*scale)  , startPos.y + ((iconSize -5)* scale))
 			startPos = ImVec2(startPos.x, endPos.y - adjustedHeight)
 			-- draw the overlay
 			ImGui.GetWindowDrawList():AddRectFilled(startPos, endPos, OverlayColor)
-			ImGui.SetCursorPos(cursor_x + (iconSize / 2), cursor_y + (iconSize / 2))
+			ImGui.SetCursorPos(cursor_x + (scale* (iconSize / 2)), cursor_y + (scale * (iconSize / 2)))
 			-- print the remaining time
 
 			ImGui.Text("%d", remaining-1)
@@ -230,22 +230,22 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 		else
 			-- spell is not ready to cast and was not clicked most likely from global cooldown or just memmed
 			-- draw the overlay
-			ImGui.SetCursorPos(cursor_x + 8, cursor_y +5 )
+			ImGui.SetCursorPos(cursor_x + (scale *8), cursor_y +(5 * scale) )
 			OverlayColor = IM_COL32(0,0,0,255)
 			startPos = ImGui.GetCursorScreenPosVec()
-			local adjustedHeight = (iconSize -5) 
-			endPos = ImVec2(startPos.x + iconSize -5  , startPos.y + iconSize -5)
+			local adjustedHeight = (iconSize -5) * scale
+			endPos = ImVec2(startPos.x + ((iconSize -5)*scale)  , startPos.y + ((iconSize -5)* scale))
 			startPos = ImVec2(startPos.x, endPos.y - adjustedHeight)
 			ImGui.GetWindowDrawList():AddRectFilled(startPos, endPos, OverlayColor)
 			ImGui.SetCursorPos(cursor_x + (iconSize / 2), cursor_y + (iconSize / 2))
 		end
 		-- draw the gem Color overlay faded out to show the spell is not ready
 		ImGui.SetCursorPos(cursor_x , cursor_y + 1)
-		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(iconSize + 37, iconSize + 2), ImVec2(0, 0), ImVec2(1,1), ImVec4(0,0,0,0.7))
+		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale*(iconSize + 37), scale*(iconSize + 2)), ImVec2(0, 0), ImVec2(1,1), ImVec4(0,0,0,0.7))
 	else
 		-- draw the gem Color overlay
 		ImGui.SetCursorPos(cursor_x , cursor_y + 1)
-		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(iconSize + 37, iconSize + 2))
+		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale*(iconSize + 37), scale*(iconSize + 2)))
 	end
 	
 	if mq.TLO.Cast.Ready('"' .. spell.sName .. '"')() then
@@ -258,7 +258,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	local sName = spell.sName or '??'
 	ImGui.PushID(tostring(iconID) .. sName .. "_invis_btn")
 	ImGui.SetCursorPos(cursor_x, cursor_y)
-	ImGui.InvisibleButton(sName, ImVec2(iconSize, iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
+	ImGui.InvisibleButton(sName, ImVec2(scale * iconSize, scale * iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
 	ImGui.PopID()
 end
 
@@ -304,12 +304,12 @@ local function GetSpells()
 	end
 end
 
-local function DrawThemeWin()
-	if not themeGUI then return end
+local function DrawConfigWin()
+	if not configWindowShow then return end
 	local ColorCountTheme, StyleCountTheme = LoadTheme.StartTheme(theme.Theme[themeID])
 	local openTheme, showTheme = ImGui.Begin('Theme Selector##MySpells_',true,bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 	if not openTheme then
-		themeGUI = false
+		configWindowShow = false
 	end
 	if not showTheme then
 		LoadTheme.EndTheme(ColorCountTheme, StyleCountTheme)
@@ -335,6 +335,13 @@ local function DrawThemeWin()
 		ImGui.EndCombo()
 	end
 	
+	scale = ImGui.SliderFloat("Scale##DialogDB", scale, 0.8, 2)
+	if scale ~= settings[script].Scale then
+		if scale < 0.8 then scale = 0.8 end
+		settings[script].Scale = scale
+		mq.pickle(configFile, settings)
+	end
+
 	if hasThemeZ then
 		if ImGui.Button('Edit ThemeZ') then
 			mq.cmd("/lua run themez")
@@ -361,18 +368,20 @@ local function GUI_Spells()
 		return
 	end
 	if show then
+		-- ImGui.SetWindowFontScale(scale)
 		-- Calculate maxRow to account for window padding and element size
 		local windowWidth = ImGui.GetWindowWidth()
-		maxRow = math.floor(windowWidth / 44)
+		maxRow = math.floor(windowWidth / (scale*44))
 		if aSize then
 			maxRow = settings[script].maxRow
 		end
 		currentTime = os.time()
 		rowCount = 0
-		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0,0)
+		
 		if ImGui.BeginPopupContextItem("##MySpells_theme") then
-			if ImGui.MenuItem("Change Theme") then
-				themeGUI = not themeGUI
+			
+			if ImGui.MenuItem("Configure") then
+				configWindowShow = not configWindowShow
 			end
 			if ImGui.MenuItem('Auto Size') then
 				aSize = not aSize
@@ -384,8 +393,9 @@ local function GUI_Spells()
 			end
 			ImGui.EndPopup()
 		end
+		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0,0)
 		for i = 1, numGems do
-			ImGui.BeginChild("##SpellGem"..i, ImVec2(40, 33), bit32.bor(ImGuiChildFlags.NoScrollbar,ImGuiChildFlags.AlwaysUseWindowPadding))
+			ImGui.BeginChild("##SpellGem"..i, ImVec2(scale * 40, scale * 33), bit32.bor(ImGuiChildFlags.NoScrollbar,ImGuiChildFlags.AlwaysUseWindowPadding), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
 			if spellBar[i].sID > -1 then
 				DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
 				if ImGui.BeginPopupContextItem("##SpellGem"..i) then
@@ -459,12 +469,12 @@ local function GUI_Spells()
 		end
 		picker:DrawAbilityPicker()
 
-		ImGui.BeginChild("##SpellBook", ImVec2(40, 40), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
+		ImGui.BeginChild("##SpellBook", ImVec2(40 * scale , scale * 40), bit32.bor(ImGuiChildFlags.AlwaysUseWindowPadding, ImGuiChildFlags.NoScrollbar), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
 		local cursor_x, cursor_y = ImGui.GetCursorPos()
-
+		
 		if mq.TLO.Window('SpellBookWnd').Open() then
-			ImGui.SetCursorPos(cursor_x+10, cursor_y)
-			ImGui.Image(openBook:GetTextureID(), ImVec2(40, 40))
+			ImGui.SetCursorPos(cursor_x, cursor_y)
+			ImGui.Image(openBook:GetTextureID(), ImVec2(scale * 39, scale * 22))
 			if ImGui.IsItemHovered() then
 				ImGui.SetTooltip("Close Spell Book")
 				if ImGui.IsMouseReleased(0) then
@@ -472,8 +482,8 @@ local function GUI_Spells()
 				end
 			end
 		else
-			ImGui.SetCursorPos(cursor_x+10, cursor_y+5)
-			ImGui.Image(closedBook:GetTextureID(), ImVec2(40, 30))
+			ImGui.SetCursorPos(cursor_x, cursor_y)
+			ImGui.Image(closedBook:GetTextureID(), ImVec2(39 * scale , scale * 22))
 			if ImGui.IsItemHovered() then
 				ImGui.SetTooltip("Open Spell Book")
 				if ImGui.IsMouseReleased(0) then
@@ -481,15 +491,15 @@ local function GUI_Spells()
 				end
 			end
 		end
+		ImGui.SetWindowFontScale(1)
 		ImGui.EndChild()
 		
 	end
-
 	LoadTheme.EndTheme(ColorCount, StyleCount)
 	ImGui.End()
-
-	if themeGUI then
-		DrawThemeWin()
+	
+	if configWindowShow then
+		DrawConfigWin()
 	end
 
 end
@@ -539,6 +549,7 @@ local function Loop()
 		GetSpells()
 	end
 end
+
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
 Init()
 Loop()
