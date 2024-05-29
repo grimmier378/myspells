@@ -23,6 +23,8 @@ This script creates a spell bar that allows you to cast spells from your spell g
 * Right Clicking the Title bar will bring up options to change theme, and Auto-resize the window.
 
 
-## Video
+## Videos
 
 https://www.youtube.com/watch?v=E_5a2fsxGgU
+
+https://www.youtube.com/watch?v=oPl8k7_qAYE
