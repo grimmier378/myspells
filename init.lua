@@ -43,7 +43,7 @@ local openBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/open_book.png')
 local closedBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/closed_book.png')
 local memSpell = -1
 local currentTime = os.time()
-local maxRow, rowCount, iconSize, scale = 0, 0, 30, 1
+local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
 local aSize, locked, hasThemeZ, configWindowShow = false, false, false, false
 
 defaults = {
@@ -51,7 +51,7 @@ defaults = {
 	LoadTheme = 'Default',
 	locked = false,
 	IconSize = 30,
-	maxRow = 0,
+	maxRow = 1,
 	AutoSize = false,
 }
 
@@ -191,7 +191,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	-- draw spell icon
 	animSpell:SetTextureCell(iconID or 0)	
 	ImGui.SetCursorPos(cursor_x + (scale *8), cursor_y +(5 * scale) )
-	ImGui.DrawTextureAnimation(animSpell, scale*(iconSize - 5), scale*(iconSize - 5))
+	ImGui.DrawTextureAnimation(animSpell, scale*(iconSize - 4), scale*(iconSize - 5))
 	
 	----------- overlay ----------------
 	ImGui.SetCursorPos(cursor_x, cursor_y - 2)
@@ -218,7 +218,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 			startPos = ImGui.GetCursorScreenPosVec()
 			-- adjust the height of the overlay based on the remaining time
 			local adjustedHeight = (scale*(iconSize -5)) * percent
-			endPos = ImVec2(startPos.x + ((iconSize -5)*scale)  , startPos.y + ((iconSize -5)* scale))
+			endPos = ImVec2(startPos.x + ((iconSize )*scale)  , startPos.y + ((iconSize -5)* scale))
 			startPos = ImVec2(startPos.x, endPos.y - adjustedHeight)
 			-- draw the overlay
 			ImGui.GetWindowDrawList():AddRectFilled(startPos, endPos, OverlayColor)
@@ -234,14 +234,16 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 			OverlayColor = IM_COL32(0,0,0,255)
 			startPos = ImGui.GetCursorScreenPosVec()
 			local adjustedHeight = (iconSize -5) * scale
-			endPos = ImVec2(startPos.x + ((iconSize -5)*scale)  , startPos.y + ((iconSize -5)* scale))
+			endPos = ImVec2(startPos.x + ((iconSize )*scale)  , startPos.y + ((iconSize -5)* scale))
 			startPos = ImVec2(startPos.x, endPos.y - adjustedHeight)
 			ImGui.GetWindowDrawList():AddRectFilled(startPos, endPos, OverlayColor)
 			ImGui.SetCursorPos(cursor_x + (iconSize / 2), cursor_y + (iconSize / 2))
 		end
 		-- draw the gem Color overlay faded out to show the spell is not ready
 		ImGui.SetCursorPos(cursor_x , cursor_y + 1)
-		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale*(iconSize + 37), scale*(iconSize + 2)), ImVec2(0, 0), ImVec2(1,1), ImVec4(0,0,0,0.7))
+		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale*(iconSize + 37), scale*(iconSize + 2)))
+		ImGui.SetCursorPos(cursor_x , cursor_y + 1)
+		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale*(iconSize + 37), scale*(iconSize + 2)), ImVec2(0, 0), ImVec2(1,1), ImVec4(0,0,0,0.85))
 	else
 		-- draw the gem Color overlay
 		ImGui.SetCursorPos(cursor_x , cursor_y + 1)
