@@ -180,11 +180,34 @@ local function loadSettings()
 	
 end
 
+local function MemSpell(line, spell)
+	for i = 1, numGems do
+		if spellBar[i].sName == spell then
+			spellBar[i].sClicked = os.time()
+			casting = true
+			break
+		end
+	end
+end
+
+local function CheckCasting()
+	if mq.TLO.Window('CastingWindow').Open() and not casting then
+		for i = 1, numGems do
+			if spellBar[i].sName == mq.TLO.Window('CastingWindow').Child('Casting_SpellName').Text() then
+				spellBar[i].sClicked = os.time()
+				casting = true
+				break
+			end
+		end
+	else casting = false end
+end
+
 --- comments
 ---@param iconID integer
 ---@param spell table
 ---@param i integer
 local function DrawInspectableSpellIcon(iconID, spell, i)
+	CheckCasting()
 	local cursor_x, cursor_y = ImGui.GetCursorPos()
 	local gem = mq.FindTextureAnimation('A_SpellGemHolder')
 
@@ -234,8 +257,9 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 			ImGui.GetWindowDrawList():AddRectFilled(startPos, endPos, OverlayColor)
 			ImGui.SetCursorPos(cursor_x + (scale* (iconSize / 2)), cursor_y + (scale * (iconSize / 2)))
 			-- print the remaining time
-
-			ImGui.Text("%d", remaining )--1)
+			if not spellBar[i].sName == mq.TLO.Window('CastingWindow').Open() then
+				ImGui.Text("%d", remaining )--1)
+			end
 		
 		else
 			-- spell is not ready to cast and was not clicked most likely from global cooldown or just memmed
@@ -643,28 +667,6 @@ local function GUI_Spells()
 		DrawConfigWin()
 	end
 
-end
-
-local function MemSpell(line, spell)
-	for i = 1, numGems do
-		if spellBar[i].sName == spell then
-			spellBar[i].sClicked = os.time()
-			casting = true
-			break
-		end
-	end
-end
-
-local function CheckCasting()
-	if mq.TLO.Window('CastingWindow').Open() and not casting then
-		for i = 1, numGems do
-			if spellBar[i].sName == mq.TLO.Window('CastingWindow').Child('Casting_SpellName').Text() then
-				spellBar[i].sClicked = os.time()
-				casting = true
-				break
-			end
-		end
-	else casting = false end
 end
 
 local function Init()
