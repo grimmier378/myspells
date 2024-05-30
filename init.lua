@@ -525,9 +525,8 @@ local function GUI_Spells()
 							pickerOpen = false
 							picker:ClearSelection()
 							casting = true
-						else
-							memSpell = i
 						end
+							memSpell = i
 					end
 					if ImGui.MenuItem("Inspect") then
 						mq.cmdf("/altkey /notify CastSpellWnd CSPW_Spell%s leftmouseup", i-1)
@@ -574,11 +573,12 @@ local function GUI_Spells()
 		end
         
 		ImGui.PopStyleVar()
-		if memSpell ~= -1 and not pickerOpen then
+		if memSpell ~= -1 and not picker.Draw then -- and not pickerOpen then
 			ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
 			picker:SetOpen()
 			pickerOpen = true
 		end
+		
 		if picker.Selected then
 			local selected = picker.Selected or {}
 			if selected.Type == 'Spell' then
@@ -692,6 +692,7 @@ local function Loop()
 		mq.doevents()
 		if loadSet then LoadSet(setName) end
 		if clearAll then ClearGems() end
+		if not picker.Draw then pickerOpen = false end
 		CheckCasting()
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
 		mq.delay(50)
