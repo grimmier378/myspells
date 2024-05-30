@@ -347,11 +347,11 @@ local function LoadSet(set)
 	for i = 1, numGems do
 		if setBar[i].sName ~= nil then
 			if mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName then
-				
+				setBar[i].sClicked = os.time()
+				spellBar[i]  = setBar[i]
 				if setBar[i].sName ~= "Empty" then
 					mq.cmdf("/memspell %d \"%s\"", i, setBar[i].sName)
 					-- printf("/memspell %d \"%s\"", i, setBar[i].sName)
-					
 				end
 
 				while mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName do
@@ -367,13 +367,11 @@ local function LoadSet(set)
 						return
 					end
 				end
-				spellBar[i]  = setBar[i]
 			end
 		end
 	end
 	mq.TLO.Window('SpellBookWnd').DoClose()
 	mq.delay(1)
-	-- spellBar = setBar
 	loadSet = false
 end
 
