@@ -247,14 +247,24 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 		if spell.sClicked > 0 then
 			-- spell was cast and is on cooldown
 			if percent < 0 then percent = 0 end -- Ensure percent is not negative
-			OverlayColor = IM_COL32(21,2,2,238)
 			startPos = ImGui.GetCursorScreenPosVec()
+			local oStart = startPos
+			-- timer background overlay
+			OverlayColor = IM_COL32(2,2,2,88)
+			local adjustedHeight = (scale*(iconSize -5))
+			endPos = ImVec2(startPos.x + ((iconSize )*scale)  , startPos.y + ((iconSize -5)* scale))
+			startPos = ImVec2(startPos.x, endPos.y - adjustedHeight)
+			ImGui.GetWindowDrawList():AddRectFilled(startPos, endPos, OverlayColor)
+			startPos = oStart
+			
 			-- adjust the height of the overlay based on the remaining time
-			local adjustedHeight = (scale*(iconSize -5)) * percent
+			OverlayColor = IM_COL32(41,2,2,190)
+			adjustedHeight = (scale*(iconSize -5)) * percent
 			endPos = ImVec2(startPos.x + ((iconSize )*scale)  , startPos.y + ((iconSize -5)* scale))
 			startPos = ImVec2(startPos.x, endPos.y - adjustedHeight)
 			-- draw the overlay
 			ImGui.GetWindowDrawList():AddRectFilled(startPos, endPos, OverlayColor)
+			-- set the cursor for timer display
 			ImGui.SetCursorPos(cursor_x + (scale* (iconSize / 2)), cursor_y + (scale * (iconSize / 2)))
 			-- print the remaining time
 			if not spellBar[i].sName == mq.TLO.Window('CastingWindow').Open() then
@@ -556,9 +566,8 @@ local function GUI_Spells()
 							picker:SetClose()
 							pickerOpen = false
 							picker:ClearSelection()
-						else
-							memSpell = i
 						end
+						memSpell = i
 					end
 				end
 			end
