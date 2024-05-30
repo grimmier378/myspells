@@ -259,6 +259,8 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 			-- print the remaining time
 			if not spellBar[i].sName == mq.TLO.Window('CastingWindow').Open() then
 				ImGui.Text("%d", remaining )--1)
+			elseif spellBar[i].sName ~= mq.TLO.Window('CastingWindow').Child('Casting_SpellName').Text() then
+				ImGui.Text("%d", remaining )--1)
 			end
 		
 		else
