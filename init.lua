@@ -419,7 +419,7 @@ end
 local function DrawConfigWin()
 	if not configWindowShow then return end
 	local ColorCountTheme, StyleCountTheme = LoadTheme.StartTheme(theme.Theme[themeID])
-	local openTheme, showTheme = ImGui.Begin('Theme Selector##MySpells_',true,bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
+	local openTheme, showTheme = ImGui.Begin('Config##MySpells_',true,bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 	if not openTheme then
 		configWindowShow = false
 	end
@@ -575,6 +575,7 @@ local function GUI_Spells()
         
 		ImGui.PopStyleVar()
 		if memSpell ~= -1 and not pickerOpen then
+			ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
 			picker:SetOpen()
 			pickerOpen = true
 		end
