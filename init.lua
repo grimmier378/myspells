@@ -284,10 +284,11 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 		-- draw the gem Color overlay
 		ImGui.SetCursorPos(cursor_x , cursor_y + 1)
 		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale*(iconSize + 37), scale*(iconSize + 2)))
+		spell.sClicked = -1
 	end
 	
 	if mq.TLO.Cast.Ready('"' .. spell.sName .. '"')() then
-		if currentTime - spell.sClicked > spell.sCastTime + 2 then
+		if currentTime - spell.sClicked > spell.sCastTime + 3 or spell.sClicked == -1 then
 			spell.sClicked = -1
 			spellBar[i].sClicked = -1
 		end
@@ -692,7 +693,7 @@ local function Loop()
 		if clearAll then ClearGems() end
 		CheckCasting()
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
-		mq.delay(500)
+		mq.delay(50)
 		picker:Reload()
 		GetSpells()
 	end
