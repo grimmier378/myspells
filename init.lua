@@ -20,9 +20,10 @@ local picker = AbilityPicker.new()
 local pickerOpen = false
 local Icon = require('mq.ICONS')
 local bIcon = Icon.FA_BOOK
+local gIcon = Icon.MD_SETTINGS
 local LoadTheme = require('lib.theme_loader')
 local themeID = 1
-local theme, defaults, settings = {}, {}, {}
+local theme, defaults, settings, timerColor = {}, {}, {}, {}
 local themeFile = string.format('%s/MyThemeZ.lua', mq.configDir)
 local configFile = mq.configDir .. '/myui/MySpells_Configs.lua'
 local themezDir = mq.luaDir .. '/themez/init.lua'
@@ -54,6 +55,7 @@ defaults = {
 	LoadTheme = 'Default',
 	locked = false,
 	IconSize = 30,
+	TimerColor = {1,1,1,1},
 	maxRow = 1,
 	AutoSize = false,
 }
@@ -145,6 +147,11 @@ local function loadSettings()
 		newSetting = true
 	end
 	
+	if settings[script].TimerColor == nil then
+		settings[script].TimerColor = defaults.TimerColor
+		newSetting = true
+	end
+
 	if not settings[script].LoadTheme then
 		settings[script].LoadTheme = 'Default'
 		newSetting = true
@@ -175,7 +182,7 @@ local function loadSettings()
 	locked = settings[script].locked
 	scale = settings[script].Scale
 	themeName = settings[script].LoadTheme
-		
+	timerColor = settings[script].TimerColor
 	if newSetting then mq.pickle(configFile, settings) end
 	
 end
@@ -268,9 +275,9 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 			ImGui.SetCursorPos(cursor_x + (scale* (iconSize / 2)), cursor_y + (scale * (iconSize / 2)))
 			-- print the remaining time
 			if not spellBar[i].sName == mq.TLO.Window('CastingWindow').Open() then
-				ImGui.Text("%d", remaining )--1)
+				ImGui.TextColored(ImVec4(timerColor[1], timerColor[2],timerColor[3],timerColor[4]), "%d", remaining )
 			elseif spellBar[i].sName ~= mq.TLO.Window('CastingWindow').Child('Casting_SpellName').Text() then
-				ImGui.Text("%d", remaining )--1)
+				ImGui.TextColored(ImVec4(timerColor[1], timerColor[2],timerColor[3],timerColor[4]), "%d", remaining )
 			end
 		
 		else
@@ -415,7 +422,7 @@ end
 local function ClearGems()
 	for i = 1, numGems do
 		mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i-1)
-		mq.delay(300)
+		mq.delay(16)
 		spellBar[i].sName = 'Empty'
 		spellBar[i].sID = -1
 		spellBar[i].sIcon = -1
@@ -449,22 +456,16 @@ local function DrawConfigWin()
 			if ImGui.Selectable(data.Name, isSelected) then
 				theme.LoadTheme = data.Name
 				themeID = k
-				
 				themeName = theme.LoadTheme
-				settings = dofile(configFile)
-				settings[script].LoadTheme = themeName
-				mq.pickle(configFile, settings)
 			end
 		end
 		ImGui.EndCombo()
 	end
 	
-	scale = ImGui.SliderFloat("Scale##DialogDB", scale, 0.8, 2)
+	scale = ImGui.SliderFloat("Scale##DialogDB", scale, 0.5, 2)
 	if scale ~= settings[script].Scale then
-		if scale < 0.8 then scale = 0.8 end
-		settings = dofile(configFile)
-		settings[script].Scale = scale
-		mq.pickle(configFile, settings)
+		if scale < 0.5 then scale = 0.5 end
+		if scale > 2 then scale = 2 end
 	end
 
 	if hasThemeZ then
@@ -476,6 +477,19 @@ local function DrawConfigWin()
 
 	if ImGui.Button('Reload Theme File') then
 		loadTheme()
+	end
+
+	ImGui.SeparatorText("General Settings##MySpells")
+	
+	timerColor, _ = ImGui.ColorEdit4("Timer Color##MySpells", timerColor, ImGuiColorEditFlags.AlphaBar)
+
+	if ImGui.Button("Save & Close") then
+		settings = dofile(configFile)
+		settings[script].Scale = scale
+		settings[script].TimerColor = timerColor
+		settings[script].LoadTheme = themeName
+		mq.pickle(configFile, settings)
+		configWindowShow = false
 	end
 	LoadTheme.EndTheme(ColorCountTheme, StyleCountTheme)
 	ImGui.End()
@@ -624,6 +638,28 @@ local function GUI_Spells()
 		end
 
 		if ImGui.BeginPopupContextWindow("##SpellBook") then
+			ImGui.Text(gIcon)
+			if ImGui.IsItemHovered() then
+				ImGui.SetTooltip("Config")
+				if ImGui.IsMouseReleased(0) then
+					configWindowShow = not configWindowShow
+				end
+			end
+			ImGui.SameLine()
+			local rIcon = aSize and Icon.FA_EXPAND or Icon.FA_COMPRESS
+			ImGui.Text(rIcon)
+			if ImGui.IsItemHovered() then
+				ImGui.SetTooltip("Auto Size")
+				if ImGui.IsMouseReleased(0) then
+					aSize = not aSize
+					settings = dofile(configFile)
+					if aSize then
+						settings[script].maxRow = maxRow
+					end
+					settings[script].AutoSize = aSize
+					mq.pickle(configFile, settings)
+				end
+			end
 			ImGui.SeparatorText("Save Set")
 			ImGui.SetNextItemWidth(150)
 			tmpName = ImGui.InputText("##SetName", tmpName)
@@ -667,8 +703,12 @@ local function GUI_Spells()
 			if ImGui.Button("Clear Gems") then
 				clearAll = true
 			end
+
 			ImGui.EndPopup()
 		end
+
+
+
 		ImGui.SetWindowFontScale(1)
 		ImGui.EndChild()
 		
@@ -692,7 +732,7 @@ local function Init()
 	picker:InitializeAbilities()
 	mq.event("mem_spell", "You have finished memorizing #1#.#*#", MemSpell)
 	GetSpells()
-	mq.delay(1000)
+	mq.delay(16)
 	mq.imgui.init('GUI_MySpells', GUI_Spells)
 end
 
@@ -704,7 +744,7 @@ local function Loop()
 		if not picker.Draw then pickerOpen = false end
 		CheckCasting()
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
-		mq.delay(50)
+		mq.delay(16)
 		picker:Reload()
 		GetSpells()
 	end
