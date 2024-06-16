@@ -24,8 +24,10 @@ local gIcon = Icon.MD_SETTINGS
 local LoadTheme = require('lib.theme_loader')
 local themeID = 1
 local theme, defaults, settings, timerColor = {}, {}, {}, {}
-local themeFile = string.format('%s/MyThemeZ.lua', mq.configDir)
-local configFile = mq.configDir .. '/myui/MySpells_Configs.lua'
+local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
+local configFileOld = mq.configDir .. '/myui/MySpells_Configs.lua'
+local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+local configFile = mq.configDir .. '/myui/MySpells/MySpells_Configs.lua'
 local themezDir = mq.luaDir .. '/themez/init.lua'
 local themeName = 'Default'
 local script = 'MySpells'
@@ -49,7 +51,7 @@ local aSize, locked, hasThemeZ, configWindowShow, loadSet, clearAll = false, fal
 local meName
 local setName = 'None'
 local tmpName = ''
-
+local interrupted = false
 defaults = {
 	Scale = 1.0,
 	LoadTheme = 'Default',
@@ -101,34 +103,45 @@ end
 local function loadTheme()
 	if File_Exists(themeFile) then
 		theme = dofile(themeFile)
+	else
+		if File_Exists(themeFileOld) then
+			theme = dofile(themeFileOld)
 		else
-		theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+			theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+		end
+		mq.pickle(themeFile, theme)
 	end
 	themeName = settings[script].LoadTheme or 'Default'
-		if theme and theme.Theme then
-			for tID, tData in pairs(theme.Theme) do
-				if tData['Name'] == themeName then
-					themeID = tID
-				end
+	if theme and theme.Theme then
+		for tID, tData in pairs(theme.Theme) do
+			if tData['Name'] == themeName then
+				themeID = tID
 			end
 		end
+	end
 end
 
 local function loadSettings()
+	
 	-- Check if the dialog data file exists
 	local newSetting = false
 	if not File_Exists(configFile) then
-		settings[script] = defaults
+		if File_Exists(configFileOld) then
+			local tmp = dofile(configFileOld)
+			settings[script] = tmp[script]
+		else
+			settings[script] = defaults
+		end
 		mq.pickle(configFile, settings)
 		loadSettings()
-		else
+	else
 			
 		-- Load settings from the Lua config file
 		settings = dofile(configFile)
 		if settings[script] == nil then
 			settings[script] = {}
-		settings[script] = defaults 
-		newSetting = true
+			settings[script] = defaults 
+			newSetting = true
 		end
 	end
 		
@@ -188,19 +201,25 @@ local function loadSettings()
 end
 
 local function MemSpell(line, spell)
+	-- print("Memorized: ", spell)
 	for i = 1, numGems do
 		if spellBar[i].sName == spell then
+			mq.delay(1)
 			spellBar[i].sClicked = os.time()
-			casting = true
 			break
 		end
 	end
 end
 
+local function InterruptSpell()
+	casting = false
+	interrupted = true
+end
+
 local function CheckCasting()
-	if mq.TLO.Window('CastingWindow').Open() and not casting then
+	if mq.TLO.Me.Casting() ~= nil  then
 		for i = 1, numGems do
-			if spellBar[i].sName == mq.TLO.Window('CastingWindow').Child('Casting_SpellName').Text() then
+			if spellBar[i].sName == mq.TLO.Me.Casting() then
 				spellBar[i].sClicked = os.time()
 				casting = true
 				break
@@ -239,11 +258,15 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	local startPos = ImGui.GetCursorScreenPosVec()
 	local endPos
 	local recast = spell.sRecast -- + spell.sCastTime
-	
+	local fizz = spell.sFizzle
 	local diff = currentTime - spell.sClicked
 	local remaining = recast - diff
 	local percent = remaining / recast
-
+	if interrupted then
+		spell.sClicked = os.time()
+		remaining = fizz
+		percent = remaining / fizz
+	end
 	if diff >= recast then
 		spellBar[i].sClicked = -1
 	end
@@ -327,7 +350,7 @@ local function GetSpells(slot)
 		local sName
 		local sRecast
 		local sClicked 
-		local sID, sIcon
+		local sID, sIcon, sFizzle
 		local sCastTime
 		if spellBar[slotNum] == nil then
 			spellBar[slotNum] = {}
@@ -343,6 +366,7 @@ local function GetSpells(slot)
 			sRecast = mq.TLO.Spell(sName).RecastTime.Seconds() or -1
 			sIcon = mq.TLO.Spell(sName).SpellIcon()	or -1
 			sCastTime = mq.TLO.Spell(sName).MyCastTime.Seconds() or -1
+			sFizzle = mq.TLO.Spell(sName).FizzleTime() or -1
 		else
 			sName = "Empty"
 			sID = -1
@@ -350,6 +374,7 @@ local function GetSpells(slot)
 			sClicked = -1
 			sRecast = -1
 			sCastTime = -1
+			sFizzle = -1
 		end
 			
 		spellBar[slotNum].sCastTime = sCastTime
@@ -357,6 +382,7 @@ local function GetSpells(slot)
 		spellBar[slotNum].sID = sID
 		spellBar[slotNum].sIcon = sIcon
 		spellBar[slotNum].sClicked = sClicked
+		spellBar[slotNum].sFizzle = sFizzle
 		spellBar[slotNum].sRecast = sRecast
 	end
 
@@ -385,14 +411,21 @@ end
 
 local function LoadSet(set)
 	-- print("Loading Set: ", set)
-	local setBar = settings[script][meName].Sets[set]
+	loadSet = false
+	local setBar  = {}
+	for i, t in pairs(settings[script][meName].Sets[set]) do
+		setBar[i] = {}
+		for k, v in pairs(t) do
+			setBar[i][k] = v
+		end
+	end
+	-- setBar = settings[script][meName].Sets[set]
 	mq.TLO.Window('SpellBookWnd').DoOpen()
 	mq.delay(5)
 	for i = 1, numGems do
+		GetSpells(i)
 		if setBar[i].sName ~= nil then
 			if mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName then
-				setBar[i].sClicked = os.time()
-				spellBar[i]  = setBar[i]
 				if setBar[i].sName ~= "Empty" then
 					mq.cmdf("/memspell %d \"%s\"", i, setBar[i].sName)
 					-- printf("/memspell %d \"%s\"", i, setBar[i].sName)
@@ -407,22 +440,23 @@ local function LoadSet(set)
 						spellBar[i].sRecast = -1
 						spellBar[i].sCastTime = -1
 						GetSpells(i)
-						loadSet = false
+						setName = 'None'
 						return
 					end
 				end
+				spellBar[i]  = setBar[i]
 			end
 		end
 	end
 	mq.TLO.Window('SpellBookWnd').DoClose()
 	mq.delay(1)
-	loadSet = false
+	setName = 'None'
 end
 
 local function ClearGems()
 	for i = 1, numGems do
 		mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i-1)
-		mq.delay(16)
+		mq.delay(5000, function () return mq.TLO.Me.Gem(i)() == nil end)
 		spellBar[i].sName = 'Empty'
 		spellBar[i].sID = -1
 		spellBar[i].sIcon = -1
@@ -430,6 +464,7 @@ local function ClearGems()
 		spellBar[i].sRecast = -1
 		spellBar[i].sCastTime = -1
 	end
+	GetSpells()
 	clearAll = false
 end
 
@@ -548,7 +583,6 @@ local function GUI_Spells()
 							picker:SetClose()
 							pickerOpen = false
 							picker:ClearSelection()
-							casting = true
 						end
 							memSpell = i
 					end
@@ -569,6 +603,10 @@ local function GUI_Spells()
 					elseif ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsMouseReleased(1) then
 						mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i-1)
 					end
+				end
+				if not casting and interrupted then
+					spellBar[i].sClicked = -1
+					interrupted = false
 				end
 			else
 				DrawInspectableSpellIcon(-1, spellBar[i], i)
@@ -643,13 +681,15 @@ local function GUI_Spells()
 				ImGui.SetTooltip("Config")
 				if ImGui.IsMouseReleased(0) then
 					configWindowShow = not configWindowShow
+					ImGui.CloseCurrentPopup()
 				end
 			end
 			ImGui.SameLine()
 			local rIcon = aSize and Icon.FA_EXPAND or Icon.FA_COMPRESS
 			ImGui.Text(rIcon)
 			if ImGui.IsItemHovered() then
-				ImGui.SetTooltip("Auto Size")
+				local label = aSize and "Disable Auto Size" or "Enable Auto Size"
+				ImGui.SetTooltip(label)
 				if ImGui.IsMouseReleased(0) then
 					aSize = not aSize
 					settings = dofile(configFile)
@@ -658,6 +698,7 @@ local function GUI_Spells()
 					end
 					settings[script].AutoSize = aSize
 					mq.pickle(configFile, settings)
+					ImGui.CloseCurrentPopup()
 				end
 			end
 			ImGui.SeparatorText("Save Set")
@@ -684,7 +725,9 @@ local function GUI_Spells()
 			end
 			ImGui.SameLine()
 			if ImGui.Button("Load Set") then
-				loadSet = true
+				if setName ~= 'None' then
+					loadSet = true
+				end
 				ImGui.CloseCurrentPopup()
 			end
 
@@ -702,12 +745,11 @@ local function GUI_Spells()
 
 			if ImGui.Button("Clear Gems") then
 				clearAll = true
+				ImGui.CloseCurrentPopup()
 			end
 
 			ImGui.EndPopup()
 		end
-
-
 
 		ImGui.SetWindowFontScale(1)
 		ImGui.EndChild()
@@ -725,12 +767,15 @@ end
 local function Init()
 	meName = mq.TLO.Me.Name()
 	if mq.TLO.Me.MaxMana() == 0 then print("You are not a caster!") RUNNING = false return end
+	configFile = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua',mq.configDir ,meName)
 	loadSettings()
 	if File_Exists(themezDir) then
 		hasThemeZ = true
 	end
 	picker:InitializeAbilities()
 	mq.event("mem_spell", "You have finished memorizing #1#.#*#", MemSpell)
+	mq.event("int_spell", "Your spell is interrupted.", InterruptSpell)
+	mq.event("fiz_spell", "Your#*#spell fizzles#*#", InterruptSpell)
 	GetSpells()
 	mq.delay(16)
 	mq.imgui.init('GUI_MySpells', GUI_Spells)
