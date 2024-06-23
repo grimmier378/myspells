@@ -422,7 +422,7 @@ local function LoadSet(set)
 	-- setBar = settings[script][meName].Sets[set]
 	mq.TLO.Window('SpellBookWnd').DoOpen()
 	mq.delay(5)
-	for i = 1, numGems do
+	for i = 1, numGems or 8 do
 		GetSpells(i)
 		if setBar[i].sName ~= nil then
 			if mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName then
@@ -573,6 +573,7 @@ local function GUI_Spells()
 		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0,0)
 		for i = 1, numGems do
 			ImGui.BeginChild("##SpellGem"..i, ImVec2(scale * 40, scale * 33), bit32.bor(ImGuiChildFlags.NoScrollbar,ImGuiChildFlags.AlwaysUseWindowPadding), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
+			if spellBar[i] ~= nil then
 			if spellBar[i].sID > -1 then
 				DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
 				if ImGui.BeginPopupContextItem("##SpellGem"..i) then
@@ -623,6 +624,7 @@ local function GUI_Spells()
 					end
 				end
 			end
+		end
 			ImGui.EndChild()
 			rowCount = rowCount + 1
 
