@@ -51,11 +51,13 @@ local aSize, locked, hasThemeZ, configWindowShow, loadSet, clearAll = false, fal
 local meName
 local setName = 'None'
 local tmpName = ''
+local showTitle = true
 local interrupted = false
 defaults = {
 	Scale = 1.0,
 	LoadTheme = 'Default',
 	locked = false,
+	ShowTitleBar = true,
 	IconSize = 30,
 	TimerColor = {1,1,1,1},
 	maxRow = 1,
@@ -165,6 +167,11 @@ local function loadSettings()
 		newSetting = true
 	end
 
+	if settings[script].ShowTitleBar == nil then
+		settings[script].ShowTitleBar = true
+		newSetting = true
+	end
+
 	if not settings[script].LoadTheme then
 		settings[script].LoadTheme = 'Default'
 		newSetting = true
@@ -189,6 +196,7 @@ local function loadSettings()
 	end
 		
 	-- Set the settings to the variables
+	showTitle = settings[script].ShowTitleBar
 	maxRow = settings[script].maxRow
 	aSize = settings[script].AutoSize
 	iconSize = settings[script].IconSize
@@ -535,6 +543,8 @@ end
 local function GUI_Spells()
 	local winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize)
 	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
+	if locked then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove) end
+	if not showTitle then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) end
 	local ColorCount, StyleCount =LoadTheme.StartTheme(theme.Theme[themeID])
 	local open, show = ImGui.Begin(bIcon..'##MySpells_'..mq.TLO.Me.Name(), true, winFlags)
 	if not open then
@@ -568,6 +578,20 @@ local function GUI_Spells()
 				end
 				
 				settings[script].AutoSize = aSize
+				mq.pickle(configFile, settings)
+			end
+			local lockLabel = locked and 'Unlock' or 'Lock'
+			if ImGui.MenuItem(lockLabel) then
+				locked = not locked
+				settings = dofile(configFile)
+				settings[script].locked = locked
+				mq.pickle(configFile, settings)
+			end
+			local titleBarLabel = showTitle and 'Hide Title Bar' or 'Show Title Bar'
+			if ImGui.MenuItem(titleBarLabel) then
+				showTitle = not showTitle
+				settings = dofile(configFile)
+				settings[script].ShowTitleBar = showTitle
 				mq.pickle(configFile, settings)
 			end
 			ImGui.EndPopup()
@@ -701,6 +725,34 @@ local function GUI_Spells()
 						settings[script].maxRow = maxRow
 					end
 					settings[script].AutoSize = aSize
+					mq.pickle(configFile, settings)
+					ImGui.CloseCurrentPopup()
+				end
+			end
+			ImGui.SameLine()
+			local lIcon = locked and Icon.FA_LOCK or Icon.FA_UNLOCK
+			ImGui.Text(lIcon)
+			if ImGui.IsItemHovered() then
+				local label = locked and "Unlock" or "Lock"
+				ImGui.SetTooltip(label)
+				if ImGui.IsMouseReleased(0) then
+					locked = not locked
+					settings = dofile(configFile)
+					settings[script].locked = locked
+					mq.pickle(configFile, settings)
+					ImGui.CloseCurrentPopup()
+				end
+			end
+			ImGui.SameLine()
+			local tIcon = showTitle and Icon.FA_EYE_SLASH or Icon.FA_EYE
+			ImGui.Text(tIcon)
+			if ImGui.IsItemHovered() then
+				local label = showTitle and "Hide Title Bar" or "Show Title Bar"
+				ImGui.SetTooltip(label)
+				if ImGui.IsMouseReleased(0) then
+					showTitle = not showTitle
+					settings = dofile(configFile)
+					settings[script].ShowTitleBar = showTitle
 					mq.pickle(configFile, settings)
 					ImGui.CloseCurrentPopup()
 				end
