@@ -424,27 +424,29 @@ local function LoadSet(set)
 	mq.delay(5)
 	for i = 1, numGems or 8 do
 		GetSpells(i)
-		if setBar[i].sName ~= nil then
-			if mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName then
-				if setBar[i].sName ~= "Empty" then
-					mq.cmdf("/memspell %d \"%s\"", i, setBar[i].sName)
-					-- printf("/memspell %d \"%s\"", i, setBar[i].sName)
-				end
-
-				while mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName do
-					if not mq.TLO.Window('SpellBookWnd').Open() then
-						spellBar[i].sName = 'Empty'
-						spellBar[i].sID = -1
-						spellBar[i].sIcon = -1
-						spellBar[i].sClicked = -1
-						spellBar[i].sRecast = -1
-						spellBar[i].sCastTime = -1
-						GetSpells(i)
-						setName = 'None'
-						return
+		if setBar[i] ~= nil then
+			if setBar[i].sName ~= nil then
+				if mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName then
+					if setBar[i].sName ~= "Empty" then
+						mq.cmdf("/memspell %d \"%s\"", i, setBar[i].sName)
+						-- printf("/memspell %d \"%s\"", i, setBar[i].sName)
 					end
+
+					while mq.TLO.Me.Gem(i).Name() ~= setBar[i].sName do
+						if not mq.TLO.Window('SpellBookWnd').Open() then
+							spellBar[i].sName = 'Empty'
+							spellBar[i].sID = -1
+							spellBar[i].sIcon = -1
+							spellBar[i].sClicked = -1
+							spellBar[i].sRecast = -1
+							spellBar[i].sCastTime = -1
+							GetSpells(i)
+							setName = 'None'
+							return
+						end
+					end
+					spellBar[i]  = setBar[i]
 				end
-				spellBar[i]  = setBar[i]
 			end
 		end
 	end

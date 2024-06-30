@@ -217,10 +217,10 @@ end
 
 function AbilityPicker:InitializeAbilities()
     if self.Types.Spell then InitSpellTree(self) end
-    if self.Types.AA then InitAATree(self) end
-    if self.Types.CombatAbility then InitDiscTree(self) end
-    if self.Types.Skill then InitSkillTree(self) end
-    if self.Types.Item then InitItems(self) end
+    -- if self.Types.AA then InitAATree(self) end
+    -- if self.Types.CombatAbility then InitDiscTree(self) end
+    -- if self.Types.Skill then InitSkillTree(self) end
+    -- if self.Types.Item then InitItems(self) end
 end
 
 function AbilityPicker:Reload()
@@ -236,22 +236,22 @@ function AbilityPicker:Reload()
         self.Spells = {Categories={}}
         InitSpellTree(self)
         self.ReloadSpells = false
-    elseif self.ReloadDiscs then
-        self.CombatAbilities = {Categories={}}
-        InitDiscTree(self)
-        self.ReloadDiscs = false
-    elseif self.ReloadAAs then
-        self.AltAbilities = {Types={}}
-        InitAATree(self)
-        self.ReloadAAs = false
-    elseif self.ReloadItems then
-        self.Items = {}
-        InitItems(self)
-        self.ReloadItems = false
-    elseif self.ReloadAbilities then
-        self.Abilities = {}
-        InitSkillTree(self)
-        self.ReloadAbilities = false
+    -- elseif self.ReloadDiscs then
+    --     self.CombatAbilities = {Categories={}}
+    --     InitDiscTree(self)
+    --     self.ReloadDiscs = false
+    -- elseif self.ReloadAAs then
+    --     self.AltAbilities = {Types={}}
+    --     InitAATree(self)
+    --     self.ReloadAAs = false
+    -- elseif self.ReloadItems then
+    --     self.Items = {}
+    --     InitItems(self)
+    --     self.ReloadItems = false
+    -- elseif self.ReloadAbilities then
+    --     self.Abilities = {}
+    --     InitSkillTree(self)
+    --     self.ReloadAbilities = false
     end
 end
 
@@ -503,7 +503,8 @@ end
 
 function AbilityPicker:DrawAbilityPicker()
     if not self.Open then return self.Open end
-    self.Open, self.Draw = ImGui.Begin('Ability Picker', self.Open, ImGuiWindowFlags.AlwaysAutoResize)
+    ImGui.SetNextWindowSize(0.0,0.0, ImGuiCond.FirstUseEver)
+    self.Open, self.Draw = ImGui.Begin('Ability Picker', self.Open, ImGuiWindowFlags.NoDocking)
     if self.Draw then
         if ImGui.BeginPopupContextItem() then
             if ImGui.MenuItem('Reload All') then
