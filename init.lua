@@ -26,6 +26,7 @@ local themeID = 1
 local theme, defaults, settings, timerColor = {}, {}, {}, {}
 local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
 local configFileOld = mq.configDir .. '/myui/MySpells_Configs.lua'
+local configFileOld2 = mq.configDir .. '/myui/MySpells_Configs.lua'
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 local configFile = mq.configDir .. '/myui/MySpells/MySpells_Configs.lua'
 local themezDir = mq.luaDir .. '/themez/init.lua'
@@ -47,17 +48,22 @@ local closedBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/closed_book.p
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
-local aSize, locked, hasThemeZ, configWindowShow, loadSet, clearAll = false, false, false, false, false, false
+local aSize, locked,castLocked, hasThemeZ, configWindowShow, loadSet, clearAll = false, false, false, false, false, false, false
 local meName
 local setName = 'None'
 local tmpName = ''
-local showTitle = true
+local showTitle, showTitleCasting = true, false
 local interrupted = false
+local enableCastBar = false
+local startedCast, startCastTime, castBarShow = false, 0, false
 defaults = {
 	Scale = 1.0,
 	LoadTheme = 'Default',
 	locked = false,
+	CastLocked = false,
+	ShowTitleCasting = false,
 	ShowTitleBar = true,
+	enableCastBar = false,
 	IconSize = 30,
 	TimerColor = {1,1,1,1},
 	maxRow = 1,
@@ -128,17 +134,23 @@ local function loadSettings()
 	-- Check if the dialog data file exists
 	local newSetting = false
 	if not File_Exists(configFile) then
-		if File_Exists(configFileOld) then
-			local tmp = dofile(configFileOld)
+		if File_Exists(configFileOld2) then
+			local tmp = dofile(configFileOld2)
 			settings[script] = tmp[script]
+			mq.pickle(configFile, settings)
 		else
-			settings[script] = defaults
-		end
+			if File_Exists(configFileOld) then
+				local tmp = dofile(configFileOld)
+				settings[script] = tmp[script]
+			else
+				settings[script] = defaults
+			end
 		mq.pickle(configFile, settings)
-		loadSettings()
+		-- loadSettings()
+		end
 	else
-			
 		-- Load settings from the Lua config file
+
 		settings = dofile(configFile)
 		if settings[script] == nil then
 			settings[script] = {}
@@ -183,6 +195,21 @@ local function loadSettings()
 		newSetting = true
 	end
 
+	if settings[script].EnableCastBar == nil then
+		settings[script].EnableCastBar = false
+		newSetting = true
+	end
+
+	if settings[script].CastLocked == nil then
+		settings[script].CastLocked = false
+		newSetting = true
+	end
+
+	if settings[script].ShowTitleCasting == nil then
+		settings[script].ShowTitleCasting = false
+		newSetting = true
+	end
+
 	loadTheme()
 
 	if settings[script].IconSize == nil then
@@ -196,6 +223,9 @@ local function loadSettings()
 	end
 		
 	-- Set the settings to the variables
+	showTitleCasting = settings[script].ShowTitleCasting
+	castLocked = settings[script].CastLocked
+	enableCastBar = settings[script].EnableCastBar
 	showTitle = settings[script].ShowTitleBar
 	maxRow = settings[script].maxRow
 	aSize = settings[script].AutoSize
@@ -219,6 +249,14 @@ local function MemSpell(line, spell)
 	end
 end
 
+local function CastDetect(line, spell)
+	-- print("Memorized: ", spell)
+	if not startedCast then
+		startedCast = true
+		startCastTime = os.time()
+	end
+end
+
 local function InterruptSpell()
 	casting = false
 	interrupted = true
@@ -226,6 +264,7 @@ end
 
 local function CheckCasting()
 	if mq.TLO.Me.Casting() ~= nil  then
+		castBarShow = true
 		for i = 1, numGems do
 			if spellBar[i].sName == mq.TLO.Me.Casting() then
 				spellBar[i].sClicked = os.time()
@@ -233,7 +272,28 @@ local function CheckCasting()
 				break
 			end
 		end
-	else casting = false end
+	else
+		casting = false
+		castBarShow = false
+		startedCast = false
+		startCastTime = 0
+	end
+end
+
+function CalculateColor(minColor, maxColor, value)
+	-- Ensure value is within the range of 0 to 100
+	value = math.max(0, math.min(100, value))
+
+	-- Calculate the proportion of the value within the range
+	local proportion = value / 100
+
+	-- Interpolate between minColor and maxColor based on the proportion
+	local r = minColor[1] + proportion * (maxColor[1] - minColor[1])
+	local g = minColor[2] + proportion * (maxColor[2] - minColor[2])
+	local b = minColor[3] + proportion * (maxColor[3] - minColor[3])
+	local a = minColor[4] + proportion * (maxColor[4] - minColor[4])
+
+	return r, g, b, a
 end
 
 --- comments
@@ -405,7 +465,7 @@ local function GetSpells(slot)
 end
 
 local function SaveSet(SetName)
-	settings = dofile(configFile)
+	
 	if settings[script][meName].Sets[SetName] == nil then
 		settings[script][meName].Sets[SetName] = {}
 	end
@@ -526,10 +586,11 @@ local function DrawConfigWin()
 
 	ImGui.SeparatorText("General Settings##MySpells")
 	
+	enableCastBar = ImGui.Checkbox("Enable Cast Bar##MySpells", enableCastBar)
 	timerColor, _ = ImGui.ColorEdit4("Timer Color##MySpells", timerColor, ImGuiColorEditFlags.AlphaBar)
 
 	if ImGui.Button("Save & Close") then
-		settings = dofile(configFile)
+		settings[script].EnableCastBar = enableCastBar
 		settings[script].Scale = scale
 		settings[script].TimerColor = timerColor
 		settings[script].LoadTheme = themeName
@@ -549,9 +610,6 @@ local function GUI_Spells()
 	local open, show = ImGui.Begin(bIcon..'##MySpells_'..mq.TLO.Me.Name(), true, winFlags)
 	if not open then
 		RUNNING = false
-		LoadTheme.EndTheme(ColorCount, StyleCount)
-		ImGui.End()
-		return
 	end
 	if show then
 		-- ImGui.SetWindowFontScale(scale)
@@ -572,7 +630,7 @@ local function GUI_Spells()
 			local aLabel = aSize and 'Disable Auto Size' or 'Enable Auto Size'
 			if ImGui.MenuItem(aLabel) then
 				aSize = not aSize
-				settings = dofile(configFile)
+				
 				if aSize then
 					settings[script].maxRow = maxRow
 				end
@@ -583,14 +641,14 @@ local function GUI_Spells()
 			local lockLabel = locked and 'Unlock' or 'Lock'
 			if ImGui.MenuItem(lockLabel) then
 				locked = not locked
-				settings = dofile(configFile)
+				
 				settings[script].locked = locked
 				mq.pickle(configFile, settings)
 			end
 			local titleBarLabel = showTitle and 'Hide Title Bar' or 'Show Title Bar'
 			if ImGui.MenuItem(titleBarLabel) then
 				showTitle = not showTitle
-				settings = dofile(configFile)
+				
 				settings[script].ShowTitleBar = showTitle
 				mq.pickle(configFile, settings)
 			end
@@ -720,7 +778,7 @@ local function GUI_Spells()
 				ImGui.SetTooltip(label)
 				if ImGui.IsMouseReleased(0) then
 					aSize = not aSize
-					settings = dofile(configFile)
+					
 					if aSize then
 						settings[script].maxRow = maxRow
 					end
@@ -737,7 +795,7 @@ local function GUI_Spells()
 				ImGui.SetTooltip(label)
 				if ImGui.IsMouseReleased(0) then
 					locked = not locked
-					settings = dofile(configFile)
+					
 					settings[script].locked = locked
 					mq.pickle(configFile, settings)
 					ImGui.CloseCurrentPopup()
@@ -751,7 +809,7 @@ local function GUI_Spells()
 				ImGui.SetTooltip(label)
 				if ImGui.IsMouseReleased(0) then
 					showTitle = not showTitle
-					settings = dofile(configFile)
+					
 					settings[script].ShowTitleBar = showTitle
 					mq.pickle(configFile, settings)
 					ImGui.CloseCurrentPopup()
@@ -789,7 +847,7 @@ local function GUI_Spells()
 
 			if setName ~= 'None' then
 				if ImGui.Button("Delete Set") then
-					settings = dofile(configFile)
+					
 					settings[script][meName].Sets[setName] = nil
 					mq.pickle(configFile, settings)
 					setName = 'None'
@@ -818,12 +876,69 @@ local function GUI_Spells()
 		DrawConfigWin()
 	end
 
+	if enableCastBar and castBarShow then
+		local castFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse)
+		if castLocked then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoMove) end
+		if not showTitleCasting then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoTitleBar) end
+		local ColorCountCast, StyleCountCast =LoadTheme.StartTheme(theme.Theme[themeID])
+		ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
+		ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
+		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_'..mq.TLO.Me.Name(), true, castFlags)
+		if not openCast then
+			castBarShow = false
+		end
+		if showCast then
+			local castingName = mq.TLO.Me.Casting.Name() or nil
+			local castTime = mq.TLO.Spell(castingName).MyCastTime.TotalSeconds() or 0
+
+			if castingName == nil then
+				startCastTime = 0
+				castBarShow = false
+			end
+			if castingName ~= nil and startCastTime ~= 0 then
+				ImGui.BeginChild("##CastBar", ImVec2(-1,-1), bit32.bor(ImGuiChildFlags.NoScrollbar, ImGuiChildFlags.NoScrollWithMouse), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
+				local diff = os.time() - startCastTime
+				local remaining = castTime - diff
+				if remaining < 0 then remaining = 0 end
+				local colorHpMin = {0.0, 1.0, 0.0, 1.0}
+				local colorHpMax = {1.0, 0.0, 0.0, 1.0}
+				local hr,hg,hb,ha = CalculateColor(colorHpMin, colorHpMax, (remaining / castTime * 100))
+				ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(hr, hg, hb, ha))
+				ImGui.ProgressBar(remaining / castTime , ImVec2(ImGui.GetWindowWidth(), 15), '')
+				ImGui.PopStyleColor()
+
+				ImGui.TextColored(ImVec4(timerColor[1], timerColor[2],timerColor[3],timerColor[4]), "%s %ds",castingName, remaining )
+				ImGui.EndChild()
+			end
+			if ImGui.BeginPopupContextItem("##MySpells_CastWin") then
+
+				local lockLabel = castLocked and 'Unlock' or 'Lock'
+				if ImGui.MenuItem(lockLabel.."##Casting") then
+					castLocked = not castLocked
+	
+					settings[script].CastLocked = castLocked
+					mq.pickle(configFile, settings)
+				end
+				local titleBarLabel = showTitleCasting and 'Hide Title Bar' or 'Show Title Bar'
+				if ImGui.MenuItem(titleBarLabel.."##Casting") then
+					showTitleCasting = not showTitleCasting
+					settings[script].ShowTitleCasting = showTitleCasting
+					mq.pickle(configFile, settings)
+				end
+				ImGui.EndPopup()
+			end
+		end
+		LoadTheme.EndTheme(ColorCountCast, StyleCountCast)
+		ImGui.End()
+	end
+
 end
 
 local function Init()
 	meName = mq.TLO.Me.Name()
 	if mq.TLO.Me.MaxMana() == 0 then print("You are not a caster!") RUNNING = false return end
-	configFile = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua',mq.configDir ,meName)
+	configFileOld2 = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua',mq.configDir ,meName)
+	configFile = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir, mq.TLO.EverQuest.Server(), meName)
 	loadSettings()
 	if File_Exists(themezDir) then
 		hasThemeZ = true
@@ -832,6 +947,7 @@ local function Init()
 	mq.event("mem_spell", "You have finished memorizing #1#.#*#", MemSpell)
 	mq.event("int_spell", "Your spell is interrupted.", InterruptSpell)
 	mq.event("fiz_spell", "Your#*#spell fizzles#*#", InterruptSpell)
+	mq.event('cast_start',"You begin casting #1#.#*#", CastDetect)
 	GetSpells()
 	mq.delay(16)
 	mq.imgui.init('GUI_MySpells', GUI_Spells)
@@ -845,7 +961,7 @@ local function Loop()
 		if not picker.Draw then pickerOpen = false end
 		CheckCasting()
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...") mq.exit() end
-		mq.delay(16)
+		mq.delay(1)
 		picker:Reload()
 		GetSpells()
 	end
