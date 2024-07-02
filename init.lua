@@ -387,7 +387,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 			-- spell is not ready to cast and was not clicked most likely from global cooldown or just memmed
 			-- draw the overlay
 			ImGui.SetCursorPos(cursor_x + (scale *8), cursor_y +(5 * scale) )
-			OverlayColor = IM_COL32(0,0,0,255)
+			OverlayColor = IM_COL32(0,0,0,190)
 			startPos = ImGui.GetCursorScreenPosVec()
 			local adjustedHeight = (iconSize -5) * scale
 			endPos = ImVec2(startPos.x + ((iconSize )*scale)  , startPos.y + ((iconSize -5)* scale))
