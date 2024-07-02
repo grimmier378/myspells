@@ -23,7 +23,7 @@ local bIcon = Icon.FA_BOOK
 local gIcon = Icon.MD_SETTINGS
 local LoadTheme = require('lib.theme_loader')
 local themeID = 1
-local theme, defaults, settings, timerColor = {}, {}, {}, {}
+local theme, castTheme, defaults, settings, timerColor = {}, {}, {}, {}, {}
 local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
 local configFileOld = mq.configDir .. '/myui/MySpells_Configs.lua'
 local configFileOld2 = mq.configDir .. '/myui/MySpells_Configs.lua'
@@ -55,12 +55,14 @@ local tmpName = ''
 local showTitle, showTitleCasting = true, false
 local interrupted = false
 local enableCastBar = false
+local castTransparency = 1.0
 local startedCast, startCastTime, castBarShow = false, 0, false
 defaults = {
 	Scale = 1.0,
 	LoadTheme = 'Default',
 	locked = false,
 	CastLocked = false,
+	CastTransperancy = 1.0,
 	ShowTitleCasting = false,
 	ShowTitleBar = true,
 	enableCastBar = false,
@@ -68,6 +70,20 @@ defaults = {
 	TimerColor = {1,1,1,1},
 	maxRow = 1,
 	AutoSize = false,
+}
+
+local manaClass = {
+	[1] = 'WIZ',
+	[2] = 'MAG',
+	[3] = 'NEC',
+	[4] = 'ENC',
+	[5] = 'DRU',
+	[6] = 'SHM',
+	[7] = 'CLR',
+	[8] = 'BST',
+	[9] = 'PAL',
+	[10] = 'RNG',
+	[11] = 'SHD',
 }
 
 local function pickColor(spellID)
@@ -111,11 +127,14 @@ end
 local function loadTheme()
 	if File_Exists(themeFile) then
 		theme = dofile(themeFile)
+		castTheme = dofile(themeFile)
 	else
 		if File_Exists(themeFileOld) then
 			theme = dofile(themeFileOld)
+			castTheme = dofile(themeFileOld)
 		else
-			theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+			theme = require('themes')-- your local themes file incase the user doesn't have one in config folder
+			castTheme =  require('themes') 
 		end
 		mq.pickle(themeFile, theme)
 	end
@@ -205,6 +224,11 @@ local function loadSettings()
 		newSetting = true
 	end
 
+	if settings[script].CastTransperancy == nil then
+		settings[script].CastTransperancy = 1.0
+		newSetting = true
+	end
+
 	if settings[script].ShowTitleCasting == nil then
 		settings[script].ShowTitleCasting = false
 		newSetting = true
@@ -223,6 +247,7 @@ local function loadSettings()
 	end
 		
 	-- Set the settings to the variables
+	castTransparency = settings[script].CastTransperancy
 	showTitleCasting = settings[script].ShowTitleCasting
 	castLocked = settings[script].CastLocked
 	enableCastBar = settings[script].EnableCastBar
@@ -585,11 +610,14 @@ local function DrawConfigWin()
 	end
 
 	ImGui.SeparatorText("General Settings##MySpells")
-	
-	enableCastBar = ImGui.Checkbox("Enable Cast Bar##MySpells", enableCastBar)
+	if manaClass[mq.TLO.Me.Class.ShortName()] ~= nil then
+		castTransparency = ImGui.SliderFloat("Cast Bar Transparency##MySpells", castTransparency, 0.0, 1.0)
+		enableCastBar = ImGui.Checkbox("Enable Cast Bar##MySpells", enableCastBar)
+	end
 	timerColor, _ = ImGui.ColorEdit4("Timer Color##MySpells", timerColor, ImGuiColorEditFlags.AlphaBar)
 
 	if ImGui.Button("Save & Close") then
+		settings[script].CastTransperancy = castTransparency
 		settings[script].EnableCastBar = enableCastBar
 		settings[script].Scale = scale
 		settings[script].TimerColor = timerColor
@@ -880,7 +908,9 @@ local function GUI_Spells()
 		local castFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse)
 		if castLocked then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoMove) end
 		if not showTitleCasting then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoTitleBar) end
-		local ColorCountCast, StyleCountCast =LoadTheme.StartTheme(theme.Theme[themeID])
+		
+		castTheme.Theme[themeID].Color[2].Color[4] = castTransparency
+		local ColorCountCast, StyleCountCast = LoadTheme.StartTheme(castTheme.Theme[themeID])
 		ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
 		ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
 		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_'..mq.TLO.Me.Name(), true, castFlags)
@@ -898,7 +928,7 @@ local function GUI_Spells()
 			if castingName ~= nil and startCastTime ~= 0 then
 				ImGui.BeginChild("##CastBar", ImVec2(-1,-1), bit32.bor(ImGuiChildFlags.NoScrollbar, ImGuiChildFlags.NoScrollWithMouse), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
 				local diff = os.time() - startCastTime
-				local remaining = mq.TLO.Me.CastTimeLeft()
+				local remaining = mq.TLO.Me.CastTimeLeft() <= castTime and mq.TLO.Me.CastTimeLeft() or 0
 				-- if remaining < 0 then remaining = 0 end
 				local colorHpMin = {0.0, 1.0, 0.0, 1.0}
 				local colorHpMax = {1.0, 0.0, 0.0, 1.0}
