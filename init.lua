@@ -889,7 +889,7 @@ local function GUI_Spells()
 		end
 		if showCast then
 			local castingName = mq.TLO.Me.Casting.Name() or nil
-			local castTime = mq.TLO.Spell(castingName).MyCastTime.TotalSeconds() or 0
+			local castTime = mq.TLO.Spell(castingName).MyCastTime() or 0
 
 			if castingName == nil then
 				startCastTime = 0
@@ -898,16 +898,16 @@ local function GUI_Spells()
 			if castingName ~= nil and startCastTime ~= 0 then
 				ImGui.BeginChild("##CastBar", ImVec2(-1,-1), bit32.bor(ImGuiChildFlags.NoScrollbar, ImGuiChildFlags.NoScrollWithMouse), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
 				local diff = os.time() - startCastTime
-				local remaining = castTime - diff
-				if remaining < 0 then remaining = 0 end
+				local remaining = mq.TLO.Me.CastTimeLeft()
+				-- if remaining < 0 then remaining = 0 end
 				local colorHpMin = {0.0, 1.0, 0.0, 1.0}
 				local colorHpMax = {1.0, 0.0, 0.0, 1.0}
 				local hr,hg,hb,ha = CalculateColor(colorHpMin, colorHpMax, (remaining / castTime * 100))
 				ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(hr, hg, hb, ha))
 				ImGui.ProgressBar(remaining / castTime , ImVec2(ImGui.GetWindowWidth(), 15), '')
 				ImGui.PopStyleColor()
-
-				ImGui.TextColored(ImVec4(timerColor[1], timerColor[2],timerColor[3],timerColor[4]), "%s %ds",castingName, remaining )
+				local lbl = remaining > 0 and string.format("%.1f",(remaining / 1000))
+				ImGui.TextColored(ImVec4(timerColor[1], timerColor[2],timerColor[3],timerColor[4]), "%s %ss",castingName, lbl )
 				ImGui.EndChild()
 			end
 			if ImGui.BeginPopupContextItem("##MySpells_CastWin") then
