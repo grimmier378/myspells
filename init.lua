@@ -55,6 +55,7 @@ local tmpName = ''
 local showTitle, showTitleCasting = true, false
 local interrupted = false
 local enableCastBar = false
+local debugShow = false
 local castTransparency = 1.0
 local startedCast, startCastTime, castBarShow = false, 0, false
 defaults = {
@@ -70,20 +71,6 @@ defaults = {
 	TimerColor = {1,1,1,1},
 	maxRow = 1,
 	AutoSize = false,
-}
-
-local manaClass = {
-	[1] = 'WIZ',
-	[2] = 'MAG',
-	[3] = 'NEC',
-	[4] = 'ENC',
-	[5] = 'DRU',
-	[6] = 'SHM',
-	[7] = 'CLR',
-	[8] = 'BST',
-	[9] = 'PAL',
-	[10] = 'RNG',
-	[11] = 'SHD',
 }
 
 local function pickColor(spellID)
@@ -610,9 +597,14 @@ local function DrawConfigWin()
 	end
 
 	ImGui.SeparatorText("General Settings##MySpells")
-	if manaClass[mq.TLO.Me.Class.ShortName()] ~= nil then
+	if mq.TLO.Me.Class.ShortName() ~= 'BRD' then
+
 		castTransparency = ImGui.SliderFloat("Cast Bar Transparency##MySpells", castTransparency, 0.0, 1.0)
 		enableCastBar = ImGui.Checkbox("Enable Cast Bar##MySpells", enableCastBar)
+		if enableCastBar then
+			ImGui.SameLine()
+			debugShow = ImGui.Checkbox("Force Show CastBar#MySpells", debugShow)
+		end
 	end
 	timerColor, _ = ImGui.ColorEdit4("Timer Color##MySpells", timerColor, ImGuiColorEditFlags.AlphaBar)
 
@@ -904,7 +896,7 @@ local function GUI_Spells()
 		DrawConfigWin()
 	end
 
-	if enableCastBar and castBarShow then
+	if enableCastBar and (castBarShow or debugShow) then
 		local castFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse)
 		if castLocked then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoMove) end
 		if not showTitleCasting then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoTitleBar) end
@@ -917,7 +909,7 @@ local function GUI_Spells()
 		if not openCast then
 			castBarShow = false
 		end
-		if showCast then
+		if showCast or debugShow then
 			local castingName = mq.TLO.Me.Casting.Name() or nil
 			local castTime = mq.TLO.Spell(castingName).MyCastTime() or 0
 
@@ -925,7 +917,7 @@ local function GUI_Spells()
 				startCastTime = 0
 				castBarShow = false
 			end
-			if castingName ~= nil and startCastTime ~= 0 then
+			if (castingName ~= nil and startCastTime ~= 0) or debugShow then
 				ImGui.BeginChild("##CastBar", ImVec2(-1,-1), bit32.bor(ImGuiChildFlags.NoScrollbar, ImGuiChildFlags.NoScrollWithMouse), bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
 				local diff = os.time() - startCastTime
 				local remaining = mq.TLO.Me.CastTimeLeft() <= castTime and mq.TLO.Me.CastTimeLeft() or 0
@@ -936,7 +928,8 @@ local function GUI_Spells()
 				ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(hr, hg, hb, ha))
 				ImGui.ProgressBar(remaining / castTime , ImVec2(ImGui.GetWindowWidth(), 15), '')
 				ImGui.PopStyleColor()
-				local lbl = remaining > 0 and string.format("%.1f",(remaining / 1000))
+				local lbl = remaining > 0 and string.format("%.1f",(remaining / 1000)) or '0'
+				
 				ImGui.TextColored(ImVec4(timerColor[1], timerColor[2],timerColor[3],timerColor[4]), "%s %ss",castingName, lbl )
 				ImGui.EndChild()
 			end
