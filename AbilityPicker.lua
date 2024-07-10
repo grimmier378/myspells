@@ -327,7 +327,7 @@ end
 local function SetTextColor(ability)
     local targetType = ability.TargetType
     local categoryName = ability.Category
-    if targetType == 'Single' or targetType == 'Line of Sight' or targetType == 'Undead' then
+    if targetType == 'Single' or targetType == 'Line of Sight' or targetType == 'Undead'  or categoryName == 'Taps'  then
         ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
     elseif targetType == 'Self' then
         ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)

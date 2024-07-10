@@ -48,7 +48,7 @@ local closedBook = mq.CreateTexture(mq.luaDir .. '/myspells/images/closed_book.p
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
-local aSize, locked,castLocked, hasThemeZ, configWindowShow, loadSet, clearAll = false, false, false, false, false, false, false
+local aSize, locked,castLocked, hasThemeZ, configWindowShow, loadSet, clearAll, CastTextColorByType = false, false, false, false, false, false, false, false
 local meName
 local setName = 'None'
 local tmpName = ''
@@ -67,6 +67,7 @@ defaults = {
 	ShowTitleCasting = false,
 	ShowTitleBar = true,
 	enableCastBar = false,
+	CastTextColorByType = false,
 	IconSize = 30,
 	TimerColor = {1,1,1,1},
 	maxRow = 1,
@@ -76,29 +77,30 @@ defaults = {
 local function pickColor(spellID)
 	local spell = mq.TLO.Spell(spellID)
 	local categoryName = spell.Category()
+	local subcaterogy = spell.Subcategory()
 	local targetType = spell.TargetType()
-	if targetType == 'Single' or targetType == 'Line of Sight' or targetType == 'Undead' then
-		return redGem
+	if targetType == 'Single' or targetType == 'Line of Sight' or targetType == 'Undead' or categoryName == 'Taps' then
+		return redGem, ImVec4(0.9, 0.1, 0.1, 1)
 	elseif targetType == 'Self' then
-		return yellowGem
+		return yellowGem, ImVec4(1, 1, 0, 1)
 	elseif targetType == 'Group v2' or targetType == 'Group v1' or targetType == 'AE PC v2' then
-		return purpleGem
+		return purpleGem, ImVec4(0.8, 0.0, 1.0, 1.0)
 	elseif targetType == 'Beam' then
-		return blueGem
+		return blueGem , ImVec4(0, 1, 1, 1)
 	elseif targetType == 'Targeted AE' and (categoryName == 'Utility Detrimental' or spell.PushBack() > 0 or spell.AERange() < 20) then
-		return greenGem
+		return greenGem, ImVec4(0, 1, 0, 1)
 	elseif targetType == 'Targeted AE' then
-		return orangeGem
+		return orangeGem, ImVec4( 1.0, 0.76, 0.03, 1.0)
 	elseif targetType == 'PB AE' then
-		return blueGem
+		return blueGem, ImVec4(0, 1, 1, 1)
 	elseif targetType == 'Pet' then
-		return redGem
+		return redGem, ImVec4(0.9, 0.1, 0.1, 1)
 	elseif targetType == 'Pet2' then
-		return redGem
+		return redGem, ImVec4(0.9, 0.1, 0.1, 1)
 	elseif targetType == 'Free Target' then
-		return greenGem
+		return greenGem, ImVec4(0, 1, 0, 1)
 	else
-		return redGem
+		return redGem, ImVec4(1,1,1,1)
 	end
 
 end
@@ -221,6 +223,11 @@ local function loadSettings()
 		newSetting = true
 	end
 
+	if settings[script].CastTextColorByType == nil then
+		settings[script].CastTextColorByType = false
+		newSetting = true
+	end
+
 	loadTheme()
 
 	if settings[script].IconSize == nil then
@@ -234,6 +241,7 @@ local function loadSettings()
 	end
 		
 	-- Set the settings to the variables
+	CastTextColorByType = settings[script].CastTextColorByType
 	castTransparency = settings[script].CastTransperancy
 	showTitleCasting = settings[script].ShowTitleCasting
 	castLocked = settings[script].CastLocked
@@ -351,7 +359,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 		spellBar[i].sClicked = -1
 	end
 
-	if not mq.TLO.Cast.Ready('"' .. spell.sName .. '"')() then
+	if not mq.TLO.Cast.Ready(i)() then
 		-- spell is not ready to cast
 		ImGui.SetCursorPos(cursor_x + (scale *8), cursor_y +(5 * scale) )
 		if spell.sClicked > 0 then
@@ -407,7 +415,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 		spell.sClicked = -1
 	end
 	
-	if mq.TLO.Cast.Ready('"' .. spell.sName .. '"')() then
+	if mq.TLO.Cast.Ready(i)() then
 		if currentTime - spell.sClicked > spell.sCastTime + 3 or spell.sClicked == -1 then
 			spell.sClicked = -1
 			spellBar[i].sClicked = -1
@@ -603,12 +611,17 @@ local function DrawConfigWin()
 		enableCastBar = ImGui.Checkbox("Enable Cast Bar##MySpells", enableCastBar)
 		if enableCastBar then
 			ImGui.SameLine()
-			debugShow = ImGui.Checkbox("Force Show CastBar#MySpells", debugShow)
+			debugShow = ImGui.Checkbox("Force Show CastBar##MySpells", debugShow)
+			CastTextColorByType = ImGui.Checkbox("Cast Text Color By Type##MySpells", CastTextColorByType)
+			ImGui.SameLine()
+			ImGui.HelpMarker("This will change the color of the cast bar text based on the spell type.")
 		end
 	end
 	timerColor, _ = ImGui.ColorEdit4("Timer Color##MySpells", timerColor, ImGuiColorEditFlags.AlphaBar)
-
+	ImGui.SameLine()
+	ImGui.HelpMarker("This will change the color of the timer text on the spell gems.\nThis is also the Text Default color for the Cast Bar.")
 	if ImGui.Button("Save & Close") then
+		settings[script].CastTextColorByType = CastTextColorByType
 		settings[script].CastTransperancy = castTransparency
 		settings[script].EnableCastBar = enableCastBar
 		settings[script].Scale = scale
@@ -912,7 +925,7 @@ local function GUI_Spells()
 		if showCast or debugShow then
 			local castingName = mq.TLO.Me.Casting.Name() or nil
 			local castTime = mq.TLO.Spell(castingName).MyCastTime() or 0
-
+			local spellID = mq.TLO.Spell(castingName).ID() or -1
 			if castingName == nil then
 				startCastTime = 0
 				castBarShow = false
@@ -929,8 +942,11 @@ local function GUI_Spells()
 				ImGui.ProgressBar(remaining / castTime , ImVec2(ImGui.GetWindowWidth(), 15), '')
 				ImGui.PopStyleColor()
 				local lbl = remaining > 0 and string.format("%.1f",(remaining / 1000)) or '0'
-				
-				ImGui.TextColored(ImVec4(timerColor[1], timerColor[2],timerColor[3],timerColor[4]), "%s %ss",castingName, lbl )
+				local _, colorSetting = pickColor(spellID)
+				if not CastTextColorByType then
+					colorSetting = ImVec4(timerColor[1], timerColor[2],timerColor[3],timerColor[4])
+				end
+				ImGui.TextColored(colorSetting, "%s %ss",castingName, lbl )
 				ImGui.EndChild()
 			end
 			if ImGui.BeginPopupContextItem("##MySpells_CastWin") then
