@@ -108,8 +108,9 @@ local function AddSpellToMap(picker, spell)
         picker.Spells[category][subCategory] = {}
         table.insert(picker.Spells[category].SubCategories, subCategory)
     end
-    local name = spell.Name():gsub(' Rk%..*', '')
-    table.insert(picker.Spells[category][subCategory], {ID=spell.ID(), Level=spell.Level(), Name=name, RankName=spell.Name(), Category = spell.Category(), AERange =spell.AERange(),PushBack=spell.PushBack(),TargetType=spell.TargetType(), Icon=spell.SpellIcon()})
+    --local name = spell.Name():gsub(' Rk%..*', '')
+    local name = spell.Name()
+    table.insert(picker.Spells[category][subCategory], {ID=spell.ID(), Level=spell.Level(), Name=name, RankName=name, Category = spell.Category(), AERange =spell.AERange(),PushBack=spell.PushBack(),TargetType=spell.TargetType(), Icon=spell.SpellIcon()})
 end
 
 local function InitSpellTree(picker)

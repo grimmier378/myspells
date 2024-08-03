@@ -26,9 +26,9 @@ local themeID = 1
 local theme, castTheme, defaults, settings, timerColor = {}, {}, {}, {}, {}
 local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
 local configFileOld = mq.configDir .. '/myui/MySpells_Configs.lua'
-local configFileOld2 = mq.configDir .. '/myui/MySpells_Configs.lua'
+local configFileOld2 = ''
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
-local configFile = mq.configDir .. '/myui/MySpells/MySpells_Configs.lua'
+local configFile = ''
 local themezDir = mq.luaDir .. '/themez/init.lua'
 local themeName = 'Default'
 local script = 'MySpells'
@@ -141,13 +141,11 @@ local function loadSettings()
 	local newSetting = false
 	if not File_Exists(configFile) then
 		if File_Exists(configFileOld2) then
-			local tmp = dofile(configFileOld2)
-			settings[script] = tmp[script]
+			settings = dofile(configFileOld2)
 			mq.pickle(configFile, settings)
 		else
 			if File_Exists(configFileOld) then
-				local tmp = dofile(configFileOld)
-				settings[script] = tmp[script]
+				settings = dofile(configFileOld)
 			else
 				settings[script] = defaults
 			end
