@@ -42,7 +42,7 @@ local theme, castTheme, defaults, settings, timerColor = {}, {}, {}, {}, {}
 local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
 local configFileOld = mq.configDir .. '/myui/MySpells_Configs.lua'
 local configFileOld2 = ''
-local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
 local configFile = ''
 local themezDir = mq.luaDir .. '/themez/init.lua'
 local themeName = 'Default'
@@ -173,17 +173,9 @@ local function loadSettings()
 	-- Check if the dialog data file exists
 	local newSetting = false
 	if not MyUI_Utils.File.Exists(configFile) then
-		if MyUI_Utils.File.Exists(configFileOld2) then
-			settings = dofile(configFileOld2)
-			mq.pickle(configFile, settings)
-		else
-			if MyUI_Utils.File.Exists(configFileOld) then
-				settings = dofile(configFileOld)
-			else
-				settings[Module.Name] = defaults
-			end
-			mq.pickle(configFile, settings)
-		end
+		settings = defaults
+		mq.pickle(configFile, settings)
+		loadSettings()
 	else
 		-- Load settings from the Lua config file
 
@@ -583,7 +575,7 @@ function Module.RenderGUI()
 	end
 	if show then
 		-- Calculate maxRow to account for window padding and element size
-		local windowWidth = ImGui.GetWindowWidth()
+		local windowWidth = ImGui.GetWindowWidth() or 100
 		maxRow = math.floor(windowWidth / (scale * 44))
 		if aSize then
 			maxRow = settings[Module.Name].maxRow
