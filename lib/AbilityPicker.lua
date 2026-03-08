@@ -40,6 +40,7 @@
 
 local mq = require('mq')
 require('ImGui')
+local Utils = require('lib.common')
 
 local allTypes = { Spell = true, AA = true, CombatAbility = true, Item = true, Skill = true, }
 local aaTypes = { 'General', 'Archtype', 'Class', 'Special', }
@@ -124,8 +125,8 @@ local function AddSpellToMap(picker, spell)
             Category = spell.Category(),
             AERange = spell.AERange(),
             PushBack = spell.PushBack(),
-            TargetType =
-                spell.TargetType(),
+            Description = spell.Description() or 'none',
+            TargetType = spell.TargetType(),
             Icon = spell.SpellIcon(),
         })
 end
@@ -380,11 +381,11 @@ local function FilterItems(picker, filter)
 end
 
 -- Color spell names in spell picker similar to the spell bar context menus
-local function SetTextColor(ability)
+function AbilityPicker:SetTextColor(ability)
     local targetType = ability.TargetType
     local categoryName = ability.Category
     if targetType == 'Single' or targetType == 'Line of Sight' or targetType == 'Undead' or categoryName == 'Taps' then
-        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
+        ImGui.PushStyleColor(ImGuiCol.Text, 1.000, 0.384, 0.384, 1.000)
     elseif targetType == 'Self' then
         ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     elseif targetType == 'Group v2' or targetType == 'Group v1' or targetType == 'AE PC v2' then
@@ -398,9 +399,9 @@ local function SetTextColor(ability)
     elseif targetType == 'PB AE' then
         ImGui.PushStyleColor(ImGuiCol.Text, 0, 0.5, 1, 1)
     elseif targetType == 'Pet' then
-        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
+        ImGui.PushStyleColor(ImGuiCol.Text, 1.000, 0.384, 0.384, 1.000)
     elseif targetType == 'Pet2' then
-        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
+        ImGui.PushStyleColor(ImGuiCol.Text, 1.000, 0.384, 0.384, 1.000)
     elseif targetType == 'Free Target' then
         ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 0, 1)
     else
@@ -424,14 +425,25 @@ local function DrawCatSubCatTree(picker, tbl, type)
                 if ImGui.TreeNode(subCategory) then
                     local abilitySubCategory = abilityCategory[subCategory]
                     for _, ability in ipairs(abilitySubCategory) do
-                        MyUI_Utils.Animation_Spell:SetTextureCell(ability.Icon)
-                        ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Spell, 20, 20)
+                        Utils.Animation_Spell:SetTextureCell(ability.Icon)
+                        ImGui.DrawTextureAnimation(Utils.Animation_Spell, 20, 20)
                         ImGui.SameLine()
-                        if ability.TargetType then SetTextColor(ability) end
+                        if ability.TargetType then AbilityPicker:SetTextColor(ability) end
                         if ImGui.Selectable(string.format('%s - %s', ability.Level, ability.Name), false) then
                             SelectAbility(picker, type, ability.ID, ability.Name, ability.RankName, ability.Level)
                         end
                         if ability.TargetType then ImGui.PopStyleColor() end
+                        if ImGui.IsItemHovered() then
+                            ImGui.BeginTooltip()
+                            ImGui.Text("(%s)", ability.Level)
+                            ImGui.SameLine()
+                            ImGui.TextColored(ImVec4(0, 1, 1, 1), ability.Name)
+                            ImGui.Separator()
+                            ImGui.PushTextWrapPos(150)
+                            ImGui.Text(ability.Description or 'No description available')
+                            ImGui.PopTextWrapPos()
+                            ImGui.EndTooltip()
+                        end
                     end
                     ImGui.TreePop()
                 end
@@ -460,10 +472,10 @@ local function DrawAATree(picker, altAbilities)
         for _, type in ipairs(altAbilities.Types) do
             if ImGui.TreeNode(type) then
                 for _, altAbility in ipairs(altAbilities[type]) do
-                    MyUI_Utils.Animation_Spell:SetTextureCell(altAbility.Icon)
-                    ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Spell, 20, 20)
+                    Utils.Animation_Spell:SetTextureCell(altAbility.Icon)
+                    ImGui.DrawTextureAnimation(Utils.Animation_Spell, 20, 20)
                     ImGui.SameLine()
-                    if altAbility.TargetType then SetTextColor(altAbility) end
+                    if altAbility.TargetType then AbilityPicker:SetTextColor(altAbility) end
                     if ImGui.Selectable(altAbility.Name, false) then
                         SelectAbility(picker, 'AA', altAbility.ID, altAbility.Name)
                     end
@@ -500,10 +512,10 @@ end
 local function DrawItemTree(picker, items)
     if ImGui.TreeNode('Items') then
         for _, item in ipairs(items) do
-            MyUI_Utils.Animation_Item:SetTextureCell(item.Icon - 500)
-            ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Item, 20, 20)
+            Utils.Animation_Item:SetTextureCell(item.Icon - 500)
+            ImGui.DrawTextureAnimation(Utils.Animation_Item, 20, 20)
             ImGui.SameLine()
-            if item.TargetType then SetTextColor(item) end
+            if item.TargetType then AbilityPicker:SetTextColor(item) end
             if ImGui.Selectable(string.format('%s - %s', item.Name, item.SpellName), false) then
                 SelectAbility(picker, 'Item', item.ID, item.Name, nil, nil, item.SpellName)
             end
@@ -523,7 +535,7 @@ end
 local function DrawSkillTree(picker, abilities)
     if ImGui.TreeNode('Abilities') then
         for _, ability in ipairs(abilities) do
-            if ability.TargetType then SetTextColor(ability) end
+            if ability.TargetType then AbilityPicker:SetTextColor(ability) end
             if ImGui.Selectable(ability.Name, false) then
                 SelectAbility(picker, 'Ability', ability.ID, ability.Name)
             end
